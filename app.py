@@ -5,6 +5,7 @@ from src.api.controllers import (
     langchain_controller,
     llm_server_controller,
     local_llm_controller,
+    system_controller,
 )
 from src.handlers.exception_handler import add_exception_handlers
 
@@ -12,6 +13,10 @@ tags_metadata = [
     {
         "name": "health",
         "description": "checks the health of the API services",
+    },
+    {
+        "name": "system",
+        "description": "System",
     },
     {
         "name": "llm_server",
@@ -39,6 +44,12 @@ app.include_router(
     health_controller.router,
     prefix="/health",
     tags=["health"],
+    responses={404: {"description": "Not found"}},
+)
+app.include_router(
+    system_controller.router,
+    prefix="/system",
+    tags=["system"],
     responses={404: {"description": "Not found"}},
 )
 app.include_router(
