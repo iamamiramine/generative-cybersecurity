@@ -1,0 +1,22 @@
+version: '2.3'
+
+services:
+  generative-cybersecurity:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: generative-cybersecurity
+    container_name: generative-cybersecurity-container
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "0"
+    ports:
+      - "7575:80"
+    volumes:
+      - ./models:/app/models
+    runtime: nvidia
+    networks:
+      - generative-cybersecurity-network
+
+networks:
+  generative-cybersecurity-network:
+    external: true

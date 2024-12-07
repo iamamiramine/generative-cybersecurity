@@ -4,7 +4,11 @@ import requests
 from huggingface_hub import hf_hub_download
 
 
-def download_llm(models_dir, model_filename, model_id) -> dict:
+def download_llm(
+        models_dir: str = "models", 
+        model_filename: str = "WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B-f16.gguf", 
+        model_id: str = "WhiteRabbitNeo/WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B"
+    ) -> dict:
     """
     Download a model from Hugging Face Hub if not already present locally. Models are available at https://huggingface.co/api/models
 
@@ -52,7 +56,9 @@ def download_llm(models_dir, model_filename, model_id) -> dict:
     return {"Message": f"Model downloaded successfully at {model_path}"}
 
 
-def start_server(model_filename) -> dict:
+def start_server(
+        model_filename: str = "WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B-f16.gguf"
+    ) -> dict:
     """
     Start the text-generation-webui server with the specified model.
 
@@ -77,7 +83,7 @@ def start_server(model_filename) -> dict:
     import subprocess
     
     server_command = [
-        "python", "server.py",
+        "python", "text-generation-webui/server.py",
         "--model", model_filename,
         "--api"
     ]
@@ -94,7 +100,9 @@ def start_server(model_filename) -> dict:
     return {"Message": f"Server started with model: {model_filename}"}
 
 
-def check_server_status(api_url) -> dict:
+def check_server_status(
+        api_url: str = "http://127.0.0.1:5000"
+    ) -> dict:
     """
     Check if the text-generation-webui server is running and responsive.
 
