@@ -63,7 +63,7 @@ def load_pipeline(task_type: str) -> dict:
         task_type, 
         model=_model, 
         tokenizer=_tokenizer, 
-        max_new_tokens=4000,
+        max_new_tokens=256,
         do_sample=True,
         temperature=0.7,  # Lower temperature for more focused responses
         top_p=0.9,
@@ -159,6 +159,7 @@ def load_chain(use_hyde: bool = False) -> dict:
 
 
 def generate(question: str) -> str:
+    torch.cuda.empty_cache()
     if not is_chain_loaded():
         raise Exception("Chain not loaded. Please call /load-chain endpoint first")
 

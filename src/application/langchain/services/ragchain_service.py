@@ -26,10 +26,11 @@ def get_question(input):
 
 def make_rag_chain(model, retriever, rag_prompt):
     rag_chain = (
-        {"question": RunnablePassthrough()},
-        RunnablePassthrough.assign(
+        {"question": RunnablePassthrough()}
+        | RunnablePassthrough.assign(
             # context=RunnableLambda(get_question) | retriever | format_docs,
-            context= lambda x: get_question(x) | retriever | format_docs,
+            # context= lambda x: get_question(x) | retriever | format_docs,
+            context= lambda x: format_docs(retriever.get_relevant_documents(get_question(x))),
             # question=RunnablePassthrough()
             question=lambda x: get_question(x)
         )
