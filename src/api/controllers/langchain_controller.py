@@ -60,6 +60,36 @@ def load_pipeline(task_type: str):
     return langchain_service.load_pipeline(task_type)
 
 
+@router.post("/load_chain")
+def load_chain(use_hyde: bool = False):
+    """
+    Load a language chain with optional HyDE (Hypothetical Document Embeddings) enhancement.
+
+    Args:
+        use_hyde (bool, optional): Whether to use HyDE for improved retrieval. Defaults to False.
+
+    Raises:
+        Exception: If model is not loaded before calling this function
+
+    Returns:
+        dict: Dictionary containing success message
+
+    Example:
+        >>> from src.application.langchain.services.langchain_service import load_chain
+        >>> # Load standard RAG chain
+        >>> load_chain()
+        >>> # Load chain with HyDE
+        >>> load_chain(use_hyde=True)
+
+    Note:
+        - Requires model to be loaded first via load_model()
+        - Sets up either a standard RAG chain or HyDE-enhanced chain
+        - Configures system prompts for bash script generation
+        - Integrates with Streamlit chat history for memory
+    """
+    return langchain_service.load_chain(use_hyde)
+
+
 @router.post("/generate")
 def generate(question: str):
     """

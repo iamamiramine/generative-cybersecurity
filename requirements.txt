@@ -2,6 +2,7 @@ fastapi[all]
 streamlit
 
 pypdf
+rank_bm25
 
 transformers
 
