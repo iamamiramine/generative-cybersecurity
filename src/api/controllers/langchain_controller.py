@@ -60,8 +60,23 @@ def load_pipeline(task_type: str):
     return langchain_service.load_pipeline(task_type)
 
 
+@router.post("/load_docs")
+def load_docs():
+    return langchain_service.load_docs()
+
+
+@router.post("/load_ensemble_retriever_from_docs")
+def load_ensemble_retriever_from_docs():
+    return langchain_service.load_ensemble_retriever_from_docs()
+
+
+@router.post("/load_context_retriever")
+def load_context_retriever(use_hyde: bool = False):
+    return langchain_service.load_context_retriever(use_hyde)
+
+
 @router.post("/load_chain")
-def load_chain(use_hyde: bool = False):
+def load_chain():
     """
     Load a language chain with optional HyDE (Hypothetical Document Embeddings) enhancement.
 
@@ -87,7 +102,7 @@ def load_chain(use_hyde: bool = False):
         - Configures system prompts for bash script generation
         - Integrates with Streamlit chat history for memory
     """
-    return langchain_service.load_chain(use_hyde)
+    return langchain_service.load_chain()
 
 
 @router.post("/generate")

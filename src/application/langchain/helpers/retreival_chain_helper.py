@@ -1,6 +1,8 @@
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.messages.base import BaseMessage
 
+from src.application.langchain.models.tokenized_chat_prompt_model import BasicTokenizedChatPromptTemplate, RAGTokenizedChatPromptTemplate, HYDEGenerationPromptTemplate, HYDEFinalPromptTemplate
+
 
 def find_similar(vs, query):
     docs = vs.similarity_search(query)
@@ -28,10 +30,7 @@ def make_rag_chain(model, retriever, rag_prompt):
     rag_chain = (
         {"question": RunnablePassthrough()}
         | RunnablePassthrough.assign(
-            # context=RunnableLambda(get_question) | retriever | format_docs,
-            # context= lambda x: get_question(x) | retriever | format_docs,
             context= lambda x: format_docs(retriever.get_relevant_documents(get_question(x))),
-            # question=RunnablePassthrough()
             question=lambda x: get_question(x)
         )
         | rag_prompt
@@ -47,18 +46,41 @@ def make_hyde_chain(model, retriever, hyde_generation_prompt, final_prompt):
         {"question": RunnablePassthrough()} 
         | hyde_generation_prompt
         | model
+        | RunnableLambda(lambda x: {"question": get_question(x), "hypothetical_document": x})  # Convert to dict
     )
     
     # Full chain with retrieval
     hyde_chain = (
         hyde_generation
         | RunnablePassthrough.assign(
-            context=lambda x: retriever.get_relevant_documents(x) | format_docs,
-            hypothetical_document=lambda x: x,
-            question=lambda x: get_question(x)
+            context=lambda x: format_docs(retriever.get_relevant_documents(get_question(x["question"]))),
         )
         | final_prompt
         | model
     )
 
     return hyde_chain
+
+
+def prepare_hyde_prompt(tokenizer):
+    hyde_generation_prompt = HYDEGenerationPromptTemplate(
+        tokenizer=tokenizer,
+    )
+    hyde_final_prompt = HYDEFinalPromptTemplate(
+        tokenizer=tokenizer,
+    )
+    return hyde_generation_prompt, hyde_final_prompt
+
+
+def prepare_rag_prompt(tokenizer):
+    rag_prompt = RAGTokenizedChatPromptTemplate(
+        tokenizer=tokenizer,
+    )
+    return rag_prompt
+
+
+def prepare_basic_prompt(tokenizer):
+    basic_prompt = BasicTokenizedChatPromptTemplate(
+        tokenizer=tokenizer,
+    )
+    return basic_prompt
