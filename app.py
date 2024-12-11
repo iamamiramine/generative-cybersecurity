@@ -35,8 +35,8 @@ tags_metadata = [
 
 app = FastAPI(
     version="1.0",
-    title="PA-AI API",
-    description="API for PA-AI",
+    title="Generative Cybersecurity API",
+    description="API for Generative Cybersecurity",
     openapi_tags=tags_metadata,
 )
 

@@ -14,9 +14,24 @@ services:
     volumes:
       - ./models:/app/models
       - ./data:/app/data
+      - ./shared:/app/shared
     runtime: nvidia
     networks:
       - generative-cybersecurity-network
+
+  # streamlit-app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   image: streamlit-app
+  #   container_name: streamlit-app-container
+  #   environment:
+  #     NVIDIA_VISIBLE_DEVICES: "0"
+  #   ports:
+  #     - "7500:80"
+  #   runtime: nvidia
+  #   networks:
+  #     - generative-cybersecurity-network
 
 networks:
   generative-cybersecurity-network:

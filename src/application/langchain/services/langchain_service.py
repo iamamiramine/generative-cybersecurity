@@ -3,22 +3,26 @@ import re
 import os
 from langchain_huggingface.llms import HuggingFacePipeline
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
-from langchain_core.prompts import ChatPromptTemplate
 
 from transformers import BitsAndBytesConfig, AutoModelForCausalLM, AutoTokenizer, pipeline
 
-from src.application.langchain.services.retriever_service import load_retriever
 from src.application.system.services.system_service import execute_script
-from src.application.langchain.services.ragchain_service import make_rag_chain, make_hyde_chain
-from src.application.langchain.services.memory_service import create_memory_chain
 
+from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import EnsembleRetriever
+from langchain_huggingface import HuggingFaceEmbeddings
+
+from src.application.langchain.helpers.document_helper import split_documents, load_txt_files
+from src.application.langchain.helpers.vector_db_helper import create_vector_db
+from src.application.langchain.helpers.retreival_chain_helper import make_rag_chain, make_hyde_chain, prepare_hyde_prompt, prepare_rag_prompt, prepare_basic_prompt
+from src.application.langchain.helpers.memory_helper import create_memory_chain
 
 _model = None
 _tokenizer = None
 _hf = None
 
-_retriever = None
-_rag_chain = None
+_ensemble_retriever = None
+_retrieval_chain = None
 _chain = None
 
 def is_model_loaded() -> bool:
@@ -26,6 +30,7 @@ def is_model_loaded() -> bool:
 
 def is_chain_loaded() -> bool:
     return _chain is not None
+
 
 def load_model(model_id: str = "models/WhiteRabbitNeo_WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B"):
     global _model, _tokenizer
@@ -76,90 +81,66 @@ def load_pipeline(task_type: str) -> dict:
     return {"message": "Pipeline loaded successfully"}
 
 
-def load_chain(use_hyde: bool = False) -> dict:
+def load_docs() -> dict:
+    global _docs
+    _docs = load_txt_files()
+    
+    return {"message": "Docs loaded successfully"}
+
+
+def load_ensemble_retriever_from_docs() -> dict:
+    global _ensemble_retriever
+
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+    texts = split_documents(_docs)
+    vs = create_vector_db(texts, embeddings)
+    vs_retriever = vs.as_retriever()
+
+    bm25_retriever = BM25Retriever.from_texts([t.page_content for t in texts])
+
+    _ensemble_retriever = EnsembleRetriever(
+        retrievers=[bm25_retriever, vs_retriever],
+        weights=[0.5, 0.5])
+    
+    return {"message": "Ensemble retriever loaded successfully"}
+
+
+def load_context_retriever(use_hyde: bool = False) -> dict:
+    global _retrieval_chain
+
+    if use_hyde:
+        hyde_generation_prompt, hyde_final_prompt = prepare_hyde_prompt(_tokenizer)
+        _retrieval_chain = make_hyde_chain(_hf, _ensemble_retriever, hyde_generation_prompt, hyde_final_prompt)
+    else:
+        rag_prompt = prepare_rag_prompt(_tokenizer)
+        _retrieval_chain = make_rag_chain(_hf, _ensemble_retriever, rag_prompt)
+
+    return {"message": "Retrieval chain loaded successfully"}
+
+
+def load_chain() -> dict:
     global _chain
-    global _retriever
-    global _rag_chain
 
     if not is_model_loaded():
         raise Exception("Model not loaded. Please call /load-model endpoint first")
-
-    # system = """You are an AI that writes bash scripts. Please answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```."""
-
-    # user_input = """{question}"""
-
-    # conversation = """Bash Script:"""
-
-    # chat = [
-    #     {"role": "system", "content": system},
-    #     {"role": "user", "content": user_input},
-    #     {"role": "assistant", "content": conversation},
-    # ]
-
-    # prompt = _tokenizer.apply_chat_template(chat, tokenize=False, add_generation_prompt=True)
-
-    # system = """You are an AI that writes bash scripts. Using the following context, please answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```."""
-    _retriever = load_retriever()
-
-    if use_hyde:
-        system = """You are an expert in bash scripting. Given a question about bash commands, please provide an answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```."""
-
-        hyde_generation_template = """Given the following question, generate a detailed hypothetical document that would contain the answer to the question.
-        
-        Question: {question}
-        
-        Hypothetical Document:"""
-        hyde_generation_chat = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": hyde_generation_template},
-        ]
-
-        hyde_generation_prompt = _tokenizer.apply_chat_template(hyde_generation_chat, tokenize=False, add_generation_prompt=True)
-        
-        # Second prompt for final answer using hypothetical doc and retrieved context
-        final_prompt_template = """You are an expert in bash scripting. Given a question about bash commands, please provide an answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```.
-        Hypothetical Document: {hypothetical_document}
-        Retrieved Context: {context}
-        
-        Question: """
-
-        final_chat = [
-            {"role": "system", "content": final_prompt_template},
-            {"role": "user", "content": "{question}"},
-        ]
-        final_prompt = _tokenizer.apply_chat_template(final_chat, tokenize=False, add_generation_prompt=True)
-
-        _retrieval_chain = make_hyde_chain(_hf, _retriever, hyde_generation_prompt, final_prompt)
-        
-    else:
-        system = """You are an expert in bash scripting. Given a question about bash commands, please provide an answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```.
-        
-        Context: {context}
-        
-        Question: """
-
-        rag_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system),
-                ("human", "{question}"),
-            ]
-        )
-
-        # chat = [
-        #     {"role": "system", "content": system},
-        #     {"role": "user", "content": "{question}"},
-        # ]
-
-        # rag_prompt = _tokenizer.apply_chat_template(chat, tokenize=False, add_generation_prompt=True)
-
-        _retrieval_chain = make_rag_chain(_hf, _retriever, rag_prompt)
     
-    _chain = create_memory_chain(_hf, _retrieval_chain, StreamlitChatMessageHistory(key="langchain_messages"))  # Creates a memory chain using the loaded model, RAG chain, and Streamlit chat message history.
+    if _retrieval_chain == None:    
+        prompt = prepare_basic_prompt(_tokenizer)
+    else:
+        prompt = None
+
+    _chain = create_memory_chain(
+        _hf, 
+        _retrieval_chain, 
+        StreamlitChatMessageHistory(key="langchain_messages"), 
+        prompt,
+    )  # Creates a memory chain using the loaded model, RAG chain, and Streamlit chat message history.
     return {"message": "Chain loaded successfully"}
 
 
 def generate(question: str) -> str:
     torch.cuda.empty_cache()
+
     if not is_chain_loaded():
         raise Exception("Chain not loaded. Please call /load-chain endpoint first")
 
@@ -195,6 +176,9 @@ def generate(question: str) -> str:
         result = execute_script(i + 1)
         script_results.append(result)
 
-    print(script_results, flush=True)
+    # Save script execution results to file
+    with open("script_results.txt", "w") as f:
+        for i, result in enumerate(script_results, 1):
+            f.write(f"Script {i} results:\n{result}\n\n")
 
     return output
