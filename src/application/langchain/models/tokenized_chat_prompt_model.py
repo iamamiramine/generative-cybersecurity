@@ -9,7 +9,7 @@ class BaseTokenizedChatPromptTemplate(StringPromptTemplate):
     tokenizer: Any = Field(default=None) 
     prompt_config: dict = Field(default=None)
 
-    def __init__(self, tokenizer, input_variables, prompt_config_path="config/prompts.json"):
+    def __init__(self, tokenizer, input_variables, prompt_config_path="shared/config/prompts.json"):
         super().__init__(input_variables=input_variables)
         self.tokenizer = tokenizer
 
@@ -21,7 +21,7 @@ class BaseTokenizedChatPromptTemplate(StringPromptTemplate):
     
 
 class BasicTokenizedChatPromptTemplate(BaseTokenizedChatPromptTemplate):
-    def __init__(self, tokenizer, prompt_config_path="config/prompts.json"):
+    def __init__(self, tokenizer, prompt_config_path="shared/config/prompts.json"):
         super().__init__(tokenizer, input_variables=["question"], prompt_config_path=prompt_config_path)
 
     def format(self, **kwargs) -> str:
@@ -35,7 +35,7 @@ class BasicTokenizedChatPromptTemplate(BaseTokenizedChatPromptTemplate):
     
 
 class RAGTokenizedChatPromptTemplate(BaseTokenizedChatPromptTemplate):
-    def __init__(self, tokenizer, prompt_config_path="config/prompts.json"):
+    def __init__(self, tokenizer, prompt_config_path="shared/config/prompts.json"):
         super().__init__(tokenizer, input_variables=["context", "question"], prompt_config_path=prompt_config_path)
 
     def format(self, **kwargs) -> str:  # Add kwargs back
@@ -52,7 +52,7 @@ class RAGTokenizedChatPromptTemplate(BaseTokenizedChatPromptTemplate):
 
 
 class HYDEGenerationPromptTemplate(BaseTokenizedChatPromptTemplate):
-    def __init__(self, tokenizer, prompt_config_path="config/prompts.json"):
+    def __init__(self, tokenizer, prompt_config_path="shared/config/prompts.json"):
         super().__init__(tokenizer, input_variables=["question"], prompt_config_path=prompt_config_path)
 
     def format(self, **kwargs) -> str:
@@ -70,7 +70,7 @@ class HYDEGenerationPromptTemplate(BaseTokenizedChatPromptTemplate):
 
 
 class HYDEFinalPromptTemplate(BaseTokenizedChatPromptTemplate):
-    def __init__(self, tokenizer, prompt_config_path="config/prompts.json"):
+    def __init__(self, tokenizer, prompt_config_path="shared/config/prompts.json"):
         super().__init__(tokenizer, input_variables=["question", "hypothetical_document", "context"], prompt_config_path=prompt_config_path)
 
     def format(self, **kwargs) -> str:

@@ -23,6 +23,9 @@ RUN git clone https://github.com/oobabooga/text-generation-webui.git
 COPY ./requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install packages from apt
+RUN apt-get install -y nmap
+
 COPY ./src ./src
 COPY ./app.py ./app.py
 
