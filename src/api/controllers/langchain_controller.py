@@ -1,8 +1,15 @@
 from fastapi import APIRouter
+from typing import Optional
+from enum import Enum
 
 from src.application.langchain.services import langchain_service
 
 router = APIRouter()
+
+class TaskType(str, Enum):
+    """Available task types for the language model pipeline."""
+    TEXT_GENERATION = "text-generation"
+    TEXT2TEXT_GENERATION = "text2text-generation"
 
 @router.post("/load_model")
 def load_model():
@@ -29,15 +36,15 @@ def load_model():
     """
     return langchain_service.load_model()
     
-
-@router.post("/load_pipeline")
-def load_pipeline(task_type: str):
+@router.post("/load-pipeline")
+def load_pipeline(
+    task_type: TaskType = TaskType.TEXT_GENERATION
+) -> dict:
     """
-    Load a HuggingFace pipeline for the specified task type using the loaded model and tokenizer.
-
+    Load a pipeline for the specified task type.
+    
     Args:
-        task_type (str): Type of task for the pipeline. Currently supports "text-generation" 
-            and "text2text-generation".
+        task_type: The type of task for the pipeline (text-generation or text2text-generation)
 
     Raises:
         Exception: If model is not loaded before calling this function
@@ -57,8 +64,7 @@ def load_pipeline(task_type: str):
         - Sets global _hf and _task variables
         - Pipeline is configured with max_new_tokens=4000
     """
-    return langchain_service.load_pipeline(task_type)
-
+    return langchain_service.load_pipeline(task_type.value)
 
 @router.post("/load_docs")
 def load_docs():
@@ -106,12 +112,16 @@ def load_chain():
 
 
 @router.post("/generate")
-def generate(question: str):
+def generate(
+    question: str,
+    max_depth: Optional[int] = 1
+) -> dict:
     """
-    Generate a response to a question using the loaded language model pipeline.
-
+    Generate and execute bash commands based on the user's question.
+    
     Args:
-        question (str): The question to generate a response for
+        question: The user's question/prompt
+        max_depth: Maximum number of execution attempts (0=generate only, 1=execute once, >1=allow retries)
 
     Raises:
         Exception: If model is not loaded before calling this function
@@ -130,4 +140,4 @@ def generate(question: str):
         - Uses a step-by-step reasoning prompt template
         - Saves output to output.txt file
     """
-    return langchain_service.generate(question)
+    return langchain_service.generate(question, max_depth)

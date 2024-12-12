@@ -6,7 +6,7 @@ import os
 
 class ScriptExecutionInput(BaseModel):
     """Input for ScriptExecutionTool."""
-    script_number: int = Field(description="The number of the script to execute from generated_scripts directory")
+    script_path: str = Field(description="The path to the script to execute")
     timeout: Optional[int] = Field(default=60, description="Timeout in seconds for script execution")
 
 class ScriptExecutionTool(BaseTool):
@@ -24,15 +24,15 @@ class ScriptExecutionTool(BaseTool):
     
     name: str = "script_executor"
     description: str = """Execute a generated bash script and return its output. 
-    The script must exist in the generated_scripts directory and be properly formatted.
+    The script must exist and be properly formatted.
     Returns the execution results including stdout, stderr, and execution status."""
     args_schema: Type[BaseModel] = ScriptExecutionInput
 
-    def _run(self, script_number: int, timeout: int = 60) -> dict:
+    def _run(self, script_path: str, timeout: int = 60) -> dict:
         """Execute the specified script and return its output.
         
         Args:
-            script_number (int): The number of the script to execute
+            script_path (str): Path to the script to execute
             timeout (int, optional): Timeout in seconds. Defaults to 60.
             
         Returns:
@@ -47,8 +47,6 @@ class ScriptExecutionTool(BaseTool):
             subprocess.TimeoutExpired: If the script execution times out
             Exception: For other execution errors
         """
-        script_path = f"generated_scripts/command_{script_number}.sh"
-        
         if not os.path.exists(script_path):
             raise FileNotFoundError(f"Script {script_path} not found. Generate a script first.")
         
@@ -89,11 +87,6 @@ class ScriptExecutionTool(BaseTool):
                 "script_path": script_path
             }
 
-    async def _arun(self, script_number: int, timeout: int = 60) -> dict:
-        """Async version of the script execution.
-        
-        This is a placeholder that calls the sync version, as the current implementation
-        doesn't require async execution. For true async execution, this would need to be
-        implemented using asyncio.subprocess.
-        """
-        return self._run(script_number=script_number, timeout=timeout) 
+    async def _arun(self, script_path: str, timeout: int = 60) -> dict:
+        """Async version of the script execution."""
+        return self._run(script_path=script_path, timeout=timeout) 
