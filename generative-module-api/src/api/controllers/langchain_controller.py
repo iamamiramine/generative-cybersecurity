@@ -1,18 +1,31 @@
-from fastapi import APIRouter
-from typing import Optional
+from fastapi import APIRouter, HTTPException
+from typing import Optional, Dict
 from enum import Enum
 
 from src.application.langchain.services import langchain_service
-
+from src.domain.models.langchain.langchain_models import (
+    PipelineParameters, 
+    ContextRetrieverParameters, 
+    GenerateResponseParameters, 
+    ChainParameters, 
+    LoadModelParameters
+)
 router = APIRouter()
 
-class TaskType(str, Enum):
-    """Available task types for the language model pipeline."""
-    TEXT_GENERATION = "text-generation"
-    TEXT2TEXT_GENERATION = "text2text-generation"
+@router.get("/status")
+def get_status() -> Dict[str, bool]:
+    """Get the current status of the language model system"""
+    return {
+        "model_loaded": langchain_service.state.is_model_loaded(),
+        "pipeline_loaded": langchain_service.state.is_pipeline_loaded(),
+        "docs_loaded": langchain_service.state.is_docs_loaded(),
+        "retriever_loaded": langchain_service.state.is_retriever_loaded(),
+        "chain_loaded": langchain_service.state.is_chain_loaded()
+    }
+
 
 @router.post("/load_model")
-def load_model():
+def load_model(load_model_parameters: LoadModelParameters):
     """
     Load a HuggingFace model and tokenizer with 4-bit quantization.
 
@@ -34,11 +47,14 @@ def load_model():
         - Model is loaded in local_files_only mode
         - Sets global _model and _tokenizer variables
     """
-    return langchain_service.load_model()
+    response = langchain_service.load_model(load_model_parameters)
+    if "error" in response:
+        raise HTTPException(status_code=400, detail=response["error"])
+    return response
     
-@router.post("/load-pipeline")
+@router.post("/load_pipeline")
 def load_pipeline(
-    task_type: TaskType = TaskType.TEXT_GENERATION
+    pipeline_parameters: PipelineParameters
 ) -> dict:
     """
     Load a pipeline for the specified task type.
@@ -64,30 +80,42 @@ def load_pipeline(
         - Sets global _hf and _task variables
         - Pipeline is configured with max_new_tokens=4000
     """
-    return langchain_service.load_pipeline(task_type.value)
+    response = langchain_service.load_pipeline(pipeline_parameters)
+    if "error" in response:
+        raise HTTPException(status_code=400, detail=response["error"])
+    return response
 
 @router.post("/load_docs")
 def load_docs():
-    return langchain_service.load_docs()
+    response = langchain_service.load_docs()
+    if "error" in response:
+        raise HTTPException(status_code=400, detail=response["error"])
+    return response
 
 
 @router.post("/load_ensemble_retriever_from_docs")
 def load_ensemble_retriever_from_docs():
-    return langchain_service.load_ensemble_retriever_from_docs()
+    response = langchain_service.load_ensemble_retriever_from_docs()
+    if "error" in response:
+        raise HTTPException(status_code=400, detail=response["error"])
+    return response
 
 
 @router.post("/load_context_retriever")
-def load_context_retriever(use_hyde: bool = False):
-    return langchain_service.load_context_retriever(use_hyde)
+def load_context_retriever(context_retriever_parameters: ContextRetrieverParameters):
+    response = langchain_service.load_context_retriever(context_retriever_parameters)
+    if "error" in response:
+        raise HTTPException(status_code=400, detail=response["error"])
+    return response
 
 
 @router.post("/load_chain")
-def load_chain():
+def load_chain(chain_parameters: ChainParameters):
     """
     Load a language chain with optional HyDE (Hypothetical Document Embeddings) enhancement.
 
     Args:
-        use_hyde (bool, optional): Whether to use HyDE for improved retrieval. Defaults to False.
+        chain_type (str, optional): The type of chain to load. Defaults to "basic".
 
     Raises:
         Exception: If model is not loaded before calling this function
@@ -108,13 +136,15 @@ def load_chain():
         - Configures system prompts for bash script generation
         - Integrates with Streamlit chat history for memory
     """
-    return langchain_service.load_chain()
+    response = langchain_service.load_chain(chain_parameters)
+    if "error" in response:
+        raise HTTPException(status_code=400, detail=response["error"])
+    return response
 
 
 @router.post("/generate")
 def generate(
-    question: str,
-    max_depth: Optional[int] = 1
+    generate_response_parameters: GenerateResponseParameters
 ) -> dict:
     """
     Generate and execute bash commands based on the user's question.
@@ -140,4 +170,7 @@ def generate(
         - Uses a step-by-step reasoning prompt template
         - Saves output to output.txt file
     """
-    return langchain_service.generate(question, max_depth)
+    response = langchain_service.generate(generate_response_parameters)
+    if "error" in response:
+        raise HTTPException(status_code=400, detail=response["error"])
+    return response

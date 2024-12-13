@@ -1,12 +1,12 @@
 version: '2.3'
 
 services:
-  generative-cybersecurity:
+  generative-module:
     build:
-      context: .
+      context: ./generative-module-api
       dockerfile: Dockerfile
-    image: generative-cybersecurity
-    container_name: generative-cybersecurity-container
+    image: generative-module
+    container_name: generative-module-api
     environment:
       NVIDIA_VISIBLE_DEVICES: "0"
     ports:
@@ -19,19 +19,18 @@ services:
     networks:
       - generative-cybersecurity-network
 
-  # streamlit-app:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   image: streamlit-app
-  #   container_name: streamlit-app-container
-  #   environment:
-  #     NVIDIA_VISIBLE_DEVICES: "0"
-  #   ports:
-  #     - "7500:80"
-  #   runtime: nvidia
-  #   networks:
-  #     - generative-cybersecurity-network
+  streamlit-module:
+    build:
+      context: ./streamlit-module-api
+      dockerfile: Dockerfile
+    image: streamlit-module
+    container_name: streamlit-module-api
+    ports:
+      - "7500:8501"
+    volumes:
+      - ./shared:/app/shared
+    networks:
+      - generative-cybersecurity-network
 
 networks:
   generative-cybersecurity-network:

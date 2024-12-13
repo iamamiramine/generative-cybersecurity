@@ -1,0 +1,19 @@
+[server]
+headless = true
+runOnSave = false
+enableCORS = false
+enableXsrfProtection = false
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#E694FF"
+backgroundColor = "#00172B"
+secondaryBackgroundColor = "#0083B8"
+textColor = "#DCDCDC"
+font = "sans-serif"
+base = "dark"  # Add this line to control input elements styling
+
+[logger]
+level = "info"
