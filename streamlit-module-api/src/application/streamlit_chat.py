@@ -75,15 +75,22 @@ def init_session_state():
     if "current_context" not in st.session_state:
         st.session_state.current_context = None
     # Add default generation parameters
-    if "generation_params" not in st.session_state:
-        st.session_state.generation_params = {
+    if "pipeline_params" not in st.session_state:
+        st.session_state.pipeline_params = {
             "max_new_tokens": 256,
             "do_sample": True,
             "temperature": 0.7,
             "top_p": 0.9,
             "top_k": 50,
-            "repetition_penalty": 1.1
+            "repetition_penalty": 1.1,
+            "max_depth": 1
         }
+    if "model_loaded" not in st.session_state:
+        st.session_state.model_loaded = False
+    if "docs_loaded" not in st.session_state:
+        st.session_state.docs_loaded = False
+    if "retriever_loaded" not in st.session_state:
+        st.session_state.retriever_loaded = False
     
     # Debug config loading
     if st.config.get_option("server.headless"):
@@ -103,62 +110,90 @@ def render_generation_controls():
     """Render controls for generation parameters"""
     with st.sidebar:
         st.subheader("Generation Settings")
+
+        # Store previous values to detect changes
+        prev_params = st.session_state.pipeline_params.copy()
         
         # Pipeline parameters
-        st.session_state.generation_params["temperature"] = st.slider(
+        st.session_state.pipeline_params["temperature"] = st.slider(
             "Temperature", 0.0, 2.0, 
-            st.session_state.generation_params["temperature"], 
+            prev_params["temperature"],
             help="Higher values make output more random, lower values more deterministic"
         )
         
-        st.session_state.generation_params["top_p"] = st.slider(
+        st.session_state.pipeline_params["top_p"] = st.slider(
             "Top P", 0.0, 1.0, 
-            st.session_state.generation_params["top_p"],
+            prev_params["top_p"],
             help="Nucleus sampling: limits cumulative probability of tokens considered"
         )
         
-        st.session_state.generation_params["top_k"] = st.slider(
+        st.session_state.pipeline_params["top_k"] = st.slider(
             "Top K", 1, 100, 
-            st.session_state.generation_params["top_k"],
+            prev_params["top_k"],
             help="Limits the number of tokens considered for each step"
         )
         
-        st.session_state.generation_params["max_new_tokens"] = st.slider(
+        st.session_state.pipeline_params["max_new_tokens"] = st.slider(
             "Max New Tokens", 32, 1024, 
-            st.session_state.generation_params["max_new_tokens"],
+            prev_params["max_new_tokens"],
             help="Maximum length of generated response"
         )
         
-        st.session_state.generation_params["repetition_penalty"] = st.slider(
+        st.session_state.pipeline_params["repetition_penalty"] = st.slider(
             "Repetition Penalty", 1.0, 2.0, 
-            st.session_state.generation_params["repetition_penalty"],
+            prev_params["repetition_penalty"],
             help="Higher values reduce repetition in generated text"
         )
+
+        st.session_state.pipeline_params["max_depth"] = st.slider(
+            "Max Depth", 1, 5, 
+            prev_params.get("max_depth", 1),
+            help="Maximum depth of context retrieval"
+        )
         
-        # Chain type selection (only show when context is "File")
-        if st.session_state.current_context == "File":
-            chain_type = st.radio(
-                "Chain Type",
-                ["rag", "hyde"],
-                help="RAG: Regular retrieval, HYDE: Hypothetical document embeddings"
-            )
-            st.session_state.generation_params["chain_type"] = chain_type
+        chain_type = st.radio(
+            "Chain Type",
+            ["rag", "hyde"],
+            help="RAG: Regular retrieval, HYDE: Hypothetical document embeddings"
+        )
+        st.session_state.pipeline_params["chain_type"] = chain_type
+
+        if prev_params != st.session_state.pipeline_params:
+            with st.spinner("Reloading pipeline with new parameters..."):
+                load_pipeline()
 
 
+def initialize_base_components():
+    """Initialize documents and retriever at startup"""
+    # Only load if not already loaded
+    if st.session_state.model_loaded and st.session_state.docs_loaded and st.session_state.retriever_loaded:
+        return True
 
-@st.cache_data
-def load_context(context: str) -> bool:
-    """Load necessary models and data for the selected context"""
     config = get_config()
     if not config:
         return False
 
     try:
-        # Check current status
-        status = check_service_status()
-        
-        # Step 1: Load model if not loaded
-        if not status["model_loaded"]:
+        # Load documents if not loaded
+        if not st.session_state.docs_loaded:
+            st.info("Loading documents...")
+            response = requests.post(f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['docs']}")
+            if not response.ok:
+                st.error(f"Failed to load documents: {response.json().get('detail', 'Unknown error')}")
+                return False
+            st.session_state.docs_loaded = True
+
+        # Load ensemble retriever if not loaded
+        if not st.session_state.retriever_loaded:
+            st.info("Loading retriever...")
+            response = requests.post(f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['retriever']}")
+            if not response.ok:
+                st.error(f"Failed to load retriever: {response.json().get('detail', 'Unknown error')}")
+                return False
+            st.session_state.retriever_loaded = True
+
+        # Load model if not loaded
+        if not st.session_state.model_loaded:
             model_params = {
                 "model_path": "models/WhiteRabbitNeo_WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B",
                 "bit_quantization": 4
@@ -170,17 +205,34 @@ def load_context(context: str) -> bool:
             if not response.ok:
                 st.error(f"Failed to load model: {response.json().get('detail', 'Unknown error')}")
                 return False
+            st.session_state.model_loaded = True
 
-        # Step 2: Load pipeline with user parameters
-        if not status["pipeline_loaded"]:
-            pipeline_params = {
-                "max_new_tokens": st.session_state.generation_params["max_new_tokens"],
-                "do_sample": st.session_state.generation_params["do_sample"],
-                "temperature": st.session_state.generation_params["temperature"],
-                "top_p": st.session_state.generation_params["top_p"],
-                "top_k": st.session_state.generation_params["top_k"],
-                "repetition_penalty": st.session_state.generation_params["repetition_penalty"]
-            }
+        return True
+
+    except Exception as e:
+        logger.error(f"Error loading base components: {e}")
+        st.error(f"Error loading base components: {str(e)}")
+        return False
+
+def load_pipeline() -> bool:
+    """Load pipeline with current generation parameters"""
+    config = get_config()
+    if not config:
+        return False
+
+    try:
+        pipeline_params = {
+            "max_new_tokens": st.session_state.pipeline_params["max_new_tokens"],
+            "do_sample": st.session_state.pipeline_params["do_sample"],
+            "temperature": st.session_state.pipeline_params["temperature"],
+            "top_p": st.session_state.pipeline_params["top_p"],
+            "top_k": st.session_state.pipeline_params["top_k"],
+            "repetition_penalty": st.session_state.pipeline_params["repetition_penalty"],
+            "max_depth": st.session_state.pipeline_params.get("max_depth", 1)
+        }
+        
+        # Only reload if parameters have changed
+        if pipeline_params != st.session_state.pipeline_params:
             response = requests.post(
                 f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['pipeline']}", 
                 json=pipeline_params
@@ -188,34 +240,34 @@ def load_context(context: str) -> bool:
             if not response.ok:
                 st.error(f"Failed to load pipeline: {response.json().get('detail', 'Unknown error')}")
                 return False
+            # Update stored parameters
+            st.session_state.pipeline_params = pipeline_params
+            
+        return True
 
-        # Context-specific loading
+    except Exception as e:
+        logger.error(f"Error loading pipeline: {e}")
+        st.error(f"Error loading pipeline: {str(e)}")
+        return False
+    
+
+def load_context(context: str) -> bool:
+    """Load context-specific chain"""
+    config = get_config()
+    if not config:
+        return False
+
+    try:
+        # Context-specific chain loading
         if context == "File":
-            # Step 3: Load documents if not loaded
-            if not status["docs_loaded"]:
-                response = requests.post(f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['docs']}")
-                if not response.ok:
-                    st.error(f"Failed to load documents: {response.json().get('detail', 'Unknown error')}")
-                    return False
-            
-            # Step 4: Load ensemble retriever if not loaded
-            if not status["retriever_loaded"]:
-                response = requests.post(f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['retriever']}")
-                if not response.ok:
-                    st.error(f"Failed to load retriever: {response.json().get('detail', 'Unknown error')}")
-                    return False
-            
-            # Step 5: Load RAG chain
             chain_params = {
-                "chain_type": st.session_state.generation_params.get("chain_type", "rag")
+                "chain_type": st.session_state.pipeline_params.get("chain_type", "rag")
             }
         else:
-            # Load basic chain for non-File context
             chain_params = {
                 "chain_type": "basic"
             }
         
-        # Step 6: Load chain if not loaded or if chain type changed
         response = requests.post(
             f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['chain']}", 
             json=chain_params
@@ -236,11 +288,12 @@ def handle_context_switch(context: str):
     """Handle context switching with proper feedback"""
     if st.session_state.current_context != context:
         with st.spinner(f"Switching context to '{context}' and reloading..."):
-            # Check current status before loading
-            status = check_service_status()
-            if not status["model_loaded"]:
-                st.warning("Model not loaded. Loading required components...")
-            
+            # First ensure pipeline is loaded with current parameters
+            if not load_pipeline():
+                st.error("Failed to load pipeline")
+                return
+                
+            # Then load context-specific chain
             success = load_context(context)
             if success:
                 st.session_state.current_context = context
@@ -250,7 +303,6 @@ def handle_context_switch(context: str):
 
 
 def generate_response(prompt: str) -> str:
-    """Generate response from the API with error handling"""
     config = get_config()
     if not config:
         return "Error: Unable to load API configuration"
@@ -264,13 +316,14 @@ def generate_response(prompt: str) -> str:
         # Generate response with parameters
         generate_params = {
             "question": prompt,
-            "max_depth": 1
+            "max_depth": st.session_state.pipeline_params.get("max_depth", 1),
+            "messages": st.session_state.messages  # Add message history
         }
         response = requests.post(
             f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['generate']}", 
             json=generate_params
         )
-        
+
         if not response.ok:
             error_detail = response.json().get('detail', 'Unknown error')
             logger.error(f"Error from API: {error_detail}")
@@ -299,8 +352,19 @@ def display_chat_message(message: str, stream: bool = True):
 def main():
     init_session_state()
     render_header()
-    render_generation_controls() 
     
+    # Initialize base components at startup
+    if "base_components_loaded" not in st.session_state:
+        with st.spinner("Loading base components..."):
+            if initialize_base_components():
+                st.session_state.base_components_loaded = True
+                st.success("Base components loaded successfully!")
+            else:
+                st.error("Failed to load base components")
+                return
+    
+    render_generation_controls() 
+
     # Context selector
     context = st.selectbox("Select Context", ["None", "File"], index=0)
     handle_context_switch(context)

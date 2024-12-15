@@ -1,5 +1,6 @@
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.messages.base import BaseMessage
+from langchain_core.prompts import PromptTemplate
 
 from src.application.langchain.models.tokenized_chat_prompt_model import BasicTokenizedChatPromptTemplate, RAGTokenizedChatPromptTemplate, HYDEGenerationPromptTemplate, HYDEFinalPromptTemplate
 
@@ -10,7 +11,22 @@ def find_similar(vs, query):
 
 
 def format_docs(docs):
-    return "\n\n".join(doc.page_content for doc in docs)
+    try:
+        print(f"Docs type: {type(docs)}", flush=True)
+        # Sanitize each document's content
+        sanitized_contents = []
+        for doc in docs:
+            if hasattr(doc, 'page_content'):
+                # Remove problematic characters and normalize whitespace
+                content = doc.page_content.strip()
+                content = content.replace('\r', ' ').replace('\t', ' ')
+                sanitized_contents.append(content)
+        
+        # Join with double newlines
+        return "\n\n".join(sanitized_contents)
+    except Exception as e:
+        print(f"Error formatting docs: {e}", flush=True)
+        return ""
 
 
 def get_question(input):
@@ -23,6 +39,7 @@ def get_question(input):
     elif isinstance(input,BaseMessage):
         return input.content
     else:
+        print(f"Input type: {type(input)}", flush=True)
         raise Exception("string or dict with 'question' key expected as RAG chain input.")
 
 
@@ -69,18 +86,23 @@ def prepare_hyde_prompt(tokenizer):
     hyde_final_prompt = HYDEFinalPromptTemplate(
         tokenizer=tokenizer,
     )
-    return hyde_generation_prompt, hyde_final_prompt
+    return hyde_generation_prompt.get_prompt(), hyde_final_prompt.get_prompt()
 
 
 def prepare_rag_prompt(tokenizer):
-    rag_prompt = RAGTokenizedChatPromptTemplate(
-        tokenizer=tokenizer,
-    )
-    return rag_prompt
+    template = """<|im_start|>You are an expert in bash scripting. Given a question about bash commands, please provide an answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```<|im_end|>.
+
+    <|im_start|>Context: {context}<|im_end|>
+
+    <|im_start|>Question: {question}<|im_end|>
+
+    <|im_start|>Bash Script: """
+    custom_rag_prompt = PromptTemplate.from_template(template)
+    return custom_rag_prompt
 
 
 def prepare_basic_prompt(tokenizer):
     basic_prompt = BasicTokenizedChatPromptTemplate(
         tokenizer=tokenizer,
     )
-    return basic_prompt
+    return basic_prompt.get_prompt()

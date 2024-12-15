@@ -11,8 +11,8 @@ class TaskType(str, BaseEnum):
     TEXT2TEXT_GENERATION = "text2text-generation"
 
 class LoadModelParameters(BaseModel):
-    model_path: Annotated[str, Query(description="The path to the model")] = "models/WhiteRabbitNeo_WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B"
-    bit_quantization: Annotated[int, Query(description="The bit quantization to use (4 or 8)")] = 4
+    model_path: Annotated[str, Query(description="The path to the model")] # = "models/WhiteRabbitNeo_WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B"
+    bit_quantization: Annotated[int, Query(description="The bit quantization to use (4 or 8)")] # = 4
 
 class PipelineParameters(BaseModel):
     task_type: Annotated[TaskType, Query(description="The type of task for the pipeline")] = TaskType.TEXT_GENERATION

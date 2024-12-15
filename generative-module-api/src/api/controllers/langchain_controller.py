@@ -143,15 +143,12 @@ def load_chain(chain_parameters: ChainParameters):
 
 
 @router.post("/generate")
-def generate(
-    generate_response_parameters: GenerateResponseParameters
-) -> dict:
+def generate(generate_response_parameters: GenerateResponseParameters) -> dict:
     """
     Generate and execute bash commands based on the user's question.
     
     Args:
-        question: The user's question/prompt
-        max_depth: Maximum number of execution attempts (0=generate only, 1=execute once, >1=allow retries)
+        generate_response_parameters: The user's question/prompt and maximum number of execution attempts
 
     Raises:
         Exception: If model is not loaded before calling this function
@@ -174,3 +171,9 @@ def generate(
     if "error" in response:
         raise HTTPException(status_code=400, detail=response["error"])
     return response
+
+
+@router.post("/unload")
+async def unload_components_endpoint():
+    """Endpoint to unload model and pipeline components"""
+    return langchain_service.unload_components()

@@ -1,19 +1,14 @@
 {
     "basic": {
-        "system_base": "You are an AI that writes bash scripts. Please answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```.",
-        "system_example": "You are an AI that writes bash scripts. Please answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```."
+        "system_base": "<|im_start|>You are an AI that writes bash scripts. Please answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```.<|im_end|>"
     },
     "rag": {
-        "system_base": "You are an expert in bash scripting. Given a question about bash commands, please provide an answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```.",
-        "system_example": "You are an expert in bash scripting. Given a question about bash commands, please provide an answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```.\n\nContext: {context}"
+        "system_base": "<|im_start|>You are an expert in bash scripting. Given a question about bash commands, please provide an answer with bash scripts only, and make sure to format with codeblocks using ```bash and ```.<|im_end|>"
     },
     "hyde_generation": {
-        "system_base": "You are a technical documentation writer. Given a question about bash commands, generate a detailed technical document that would answer this question.\nWrite in a natural, descriptive style as if writing documentation. Include specific command examples and explanations.",
-        "hyde_template_base": "Given the following question, generate a detailed hypothetical document that would contain the answer to the question.",
-        "hyde_template_example": "Given the following question, generate a detailed hypothetical document that would contain the answer to the question.\n\nQuestion: {question}\n\nHypothetical Document:"
+        "system_base": "<|im_start|>You are a technical documentation writer. Given a question about bash commands, generate a detailed technical document that would answer this question.\nWrite in a natural, descriptive style as if writing documentation. Include specific command examples and explanations.<|im_end|>"
     },
     "hyde_final": {
-        "system_base": "You are an expert in bash scripting. Using the following context and hypothetical document as reference, provide a bash script that answers the question.\nPlease respond with bash scripts only, formatted with ```bash and ```.",
-        "system_example": "You are an expert in bash scripting. Using the following context and hypothetical document as reference, provide a bash script that answers the question.\nPlease respond with bash scripts only, formatted with ```bash and ```.\nHypothetical Document: {hypothetical_document}\nRetrieved Context: {context}"
+        "system_base": "<|im_start|>You are an expert in bash scripting. Using the following context and hypothetical document as reference, provide a bash script that answers the question.\nPlease respond with bash scripts only, formatted with ```bash and ```.<|im_end|>"
     }
 }
