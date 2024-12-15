@@ -1,5 +1,6 @@
 import os
 import json
+import re
 
 import streamlit as st
 import requests
@@ -17,11 +18,11 @@ def get_config():
     try:
         # Construct path to config file in shared/config directory
         config_path = os.path.join("shared", "config", "api_config.json")
-        
+
         # Load and parse JSON config file
         with open(config_path) as f:
             api_config = json.load(f)
-        
+
         # Return dictionary with API configuration    
         return {
             # Base URL for the generative module API
@@ -38,13 +39,12 @@ def get_config():
                 "generate": "/generate"         # Generate text endpoint
             }
         }
-    
+
     except Exception as e:
         # Log error and show error message in Streamlit UI
         logger.error(f"Error loading config: {e}")
         st.error("Failed to load API configuration") 
         return None
-
  
 def init_session_state():
     """Initialize Streamlit session state variables and default parameters"""
@@ -58,13 +58,13 @@ def init_session_state():
 
     # Default parameters for text generation pipeline
     default_params = {
-        "max_new_tokens": 256,    # Maximum number of tokens to generate
+        "max_new_tokens": 2048,    # Maximum number of NEW tokens to generate (excluding prompt)
         "do_sample": True,        # Enable sampling (vs greedy decoding)
         "temperature": 0.7,       # Controls randomness (higher = more random)
         "top_p": 0.9,            # Nucleus sampling parameter
         "top_k": 50,             # Top-k sampling parameter
         "repetition_penalty": 1.1,# Penalize repeated tokens
-        "max_depth": 1,          # Maximum depth for context retrieval
+        "max_depth": 1,          # Defines whether the script would be run or not on the Kali machine
         "chain_type": "rag"      # Type of LangChain to use (RAG = Retrieval Augmented Generation)
     }
 
@@ -146,9 +146,9 @@ def render_generation_controls():
         # Max New Tokens slider - controls response length
         # Sets upper limit on number of tokens in generated response
         st.session_state.pipeline_params["max_new_tokens"] = st.slider(
-            "Max New Tokens", 32, 1024, 
+            "Max New Tokens", 256, 4096, 
             st.session_state.pipeline_params["max_new_tokens"],
-            help="Maximum length of generated response"
+            help="Maximum length of generated response (excluding prompt)"
         )
         
         # Repetition Penalty slider - controls token reuse
@@ -162,7 +162,7 @@ def render_generation_controls():
         # Max Depth slider - controls context retrieval depth
         # Higher values allow more context to be retrieved but may slow performance
         st.session_state.pipeline_params["max_depth"] = st.slider(
-            "Max Depth", 1, 5, 
+            "Max Depth", 0, 1, 
             st.session_state.pipeline_params.get("max_depth", 1),
             help="Maximum depth of context retrieval"
         )
@@ -383,21 +383,18 @@ def generate_response(prompt: str) -> str:
         prompt (str): The user's input prompt/question
         
     Returns:
-        str: The generated response text, or an error message if generation fails
+        dict: The response data containing LLM output and execution information
     """
     # Get API configuration settings
     config = get_config()
     if not config:
-        return "Error: Unable to load API configuration"
+        return {"error": "Unable to load API configuration"}
     
     try:
         # Prepare parameters for the generate API endpoint
         generate_params = {
             "question": prompt,
-            # Get max_depth from pipeline params, default to 1 if not set
-            "max_depth": st.session_state.pipeline_params.get("max_depth", 1),
-            # Commented out for now - potential future feature
-            # "messages": st.session_state.messages
+            "max_depth": st.session_state.pipeline_params.get("max_depth", 1)
         }
         
         # Make POST request to generate endpoint
@@ -410,37 +407,27 @@ def generate_response(prompt: str) -> str:
         if not response.ok:
             error_detail = response.json().get('detail', 'Unknown error')
             logger.error(f"Error from API: {error_detail}")
-            return f"Error generating response: {error_detail}"
+            return {"error": f"Error generating response: {error_detail}"}
 
-        # Parse and return the response
-        response_data = response.json()
-        # Check for LLM output first (preferred response format)
-        if "llm_output" in response_data:
-            return response_data["llm_output"]
-        # Fall back to generic response field with default message if not found
-        return response_data.get("response", "Sorry, I couldn't generate a response.")
+        # Return the raw response data
+        return response.json()
+        
     except Exception as e:
         # Log and return any unexpected errors
         logger.error(f"Error generating response: {e}")
-        return f"Error generating response: {str(e)}"
+        return {"error": f"Error generating response: {str(e)}"}
 
 
-def display_chat_message(message: str, stream: bool = True):
-    """Display chat message with optional streaming effect"""
-    # Check if streaming effect is enabled
-    if stream:
-        # Create an empty placeholder for the chat message
-        chat_placeholder = st.empty()
-        # Iterate through message characters to create typing effect
-        for i in range(len(message)):
-            # Display message up to current character index
-            # unsafe_allow_html=True allows markdown formatting
-            chat_placeholder.markdown(message[:i+1], unsafe_allow_html=True)
-            # Add small delay between characters for realistic typing effect
-            time.sleep(0.05)
+def display_chat_message(message: dict):
+    """Display chat message with proper formatting
+    
+    Args:
+        message (dict): Message dictionary containing role, content, and format
+    """
+    if message.get("format") == "code":
+        st.code(message["content"], language="bash")
     else:
-        # If streaming disabled, display full message immediately
-        st.markdown(message)
+        st.markdown(message["content"], unsafe_allow_html=True)
 
 
 def main():
@@ -469,22 +456,103 @@ def main():
 
     # Display chat history from session state
     for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            display_chat_message(message["content"], stream=False)
+        with st.chat_message(message["role"], avatar=os.path.join("shared", "assets", "botpic.jpg") if message["role"] == "assistant" else None):
+            display_chat_message(message)
 
     # Handle new user input
     if prompt := st.chat_input("Ask me anything!"):
         # Display user message
         with st.chat_message("user"):
             st.markdown(prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.messages.append({
+            "role": "user",
+            "content": prompt,
+            "format": "text"
+        })
 
         # Generate and display assistant response
         with st.spinner("Generating response..."):
             reply = generate_response(prompt)
-            with st.chat_message("assistant", avatar=os.path.join("shared", "assets", "botpic.jpg")):
-                display_chat_message(reply)
-            st.session_state.messages.append({"role": "assistant", "content": reply})
+            
+            # Parse the response
+            try:
+                # If reply is a string, try to parse it as JSON
+                if isinstance(reply, str):
+                    response_data = json.loads(reply)
+                else:
+                    response_data = reply  # If it's already a dict
+                    
+                llm_output = response_data.get("llm_output", "")
+                execution_status = response_data.get("execution_status", [])
+                
+                # Extract only the code block from the LLM output
+                code_blocks = re.findall(r'```(?:bash|sh)\n(.*?)\n```', llm_output, re.DOTALL)
+                if code_blocks:
+                    # Display only the code block
+                    with st.chat_message("assistant", avatar=os.path.join("shared", "assets", "botpic.jpg")):
+                        st.code(code_blocks[0], language="bash")
+                    
+                    # Store the script with proper formatting
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": code_blocks[0],
+                        "format": "code"
+                    })
+                
+                    # Display Kali output if script was executed
+                    if execution_status and execution_status[0].get("executed_on_kali"):
+                        execution_result = execution_status[0].get("execution_result", {})
+                        
+                        # Create a formatted output string
+                        output_parts = []
+                        if execution_result.get("output"):
+                            output_parts.append("=== Command Output ===\n" + execution_result["output"])
+                        if execution_result.get("error"):
+                            output_parts.append("=== Error Output ===\n" + execution_result["error"])
+                        
+                        if output_parts:
+                            kali_output = "\n".join(output_parts)
+                            st.markdown("**Kali Linux Output:**")
+                            st.code(kali_output, language="bash")
+                            
+                            # Store the Kali output with proper formatting
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": kali_output,
+                                "format": "code"
+                            })
+                else:
+                    # No code blocks found in the response
+                    with st.chat_message("assistant", avatar=os.path.join("shared", "assets", "botpic.jpg")):
+                        st.error("No bash script found in the response")
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": "Error: No bash script found in the response",
+                        "format": "text"
+                    })
+                        
+            except json.JSONDecodeError as e:
+                error_msg = f"Error: Invalid response format - {str(e)}"
+                logger.error(f"JSON decode error: {e}")
+                logger.error(f"Raw response: {reply}")
+                with st.chat_message("assistant", avatar=os.path.join("shared", "assets", "botpic.jpg")):
+                    st.error(error_msg)
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": error_msg,
+                    "format": "text"
+                })
+            except Exception as e:
+                error_msg = f"Error processing response: {str(e)}"
+                logger.error(f"Unexpected error: {e}")
+                logger.error(f"Raw response: {reply}")
+                with st.chat_message("assistant", avatar=os.path.join("shared", "assets", "botpic.jpg")):
+                    st.error(error_msg)
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": error_msg,
+                    "format": "text"
+                })
 
 
 if __name__ == "__main__":

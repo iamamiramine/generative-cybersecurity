@@ -63,9 +63,9 @@ class BasicTokenizedChatPromptTemplate(BaseTokenizedChatPromptTemplate):
         # Get the base system message from config
         system = self.prompt_config["basic"]["system_base"]
         # Add question placeholder
-        question = """Question: {question}\n"""
+        question = """<|im_start|>Question: {question}<|im_end|>\n"""
         # Add answer prefix
-        answer = """Bash Script: """
+        answer = """<|im_start|>Bash Script: <|im_end|>\n"""
         # Combine all parts
         system = system + question + answer
         

@@ -246,8 +246,8 @@ def load_chain(chain_parameters: ChainParameters) -> dict:
     try:
         if chain_parameters.chain_type == "basic":
             # Create basic chain without retrieval capabilities
-            # basic_prompt = prepare_basic_prompt(state.tokenizer)
-            state.chain = create_memory_chain(state.hf, None, state.messages)
+            basic_prompt = prepare_basic_prompt(state.tokenizer)
+            state.chain = create_memory_chain(state.hf, None, state.messages, basic_prompt)
             
         elif chain_parameters.chain_type in ["rag", "hyde"]:
             # Verify retriever is loaded for RAG and HyDE chains
@@ -312,10 +312,6 @@ def generate(generate_response_parameters: GenerateResponseParameters) -> Dict[s
         # Extract bash code blocks from response
         code_blocks = re.findall(r'```(?:bash|sh)\n(.*?)\n```', output, re.DOTALL)
         
-        # Save raw output to file
-        with open(f"output_{current_call}.txt", "w") as f:
-            f.write(str(output))
-        
         # Track execution status of each script
         execution_status: List[Dict[str, Any]] = []
         
@@ -323,73 +319,67 @@ def generate(generate_response_parameters: GenerateResponseParameters) -> Dict[s
             # Create directory for generated scripts
             os.makedirs("generated_scripts", exist_ok=True)
             
-            # Process each code block
-            for i, code in enumerate(code_blocks):
-                script_num = i
-                print(f"\n[SCRIPT {current_call}_{script_num:02d}] Processing script...", flush=True)
+            # Process the first code block only
+            code = code_blocks[0]  # Always take the first script
+            script_num = 0  # Always use script number 0
+            
+            print(f"\n[SCRIPT {current_call}_{script_num:02d}] Processing script...", flush=True)
+            
+            # Add shebang if missing and save script
+            script_content = code if code.strip().startswith('#!/') else f'#!/bin/bash\n\n{code}'
+            script_path = f"generated_scripts/command_{current_call}_{script_num:02d}.sh"
+            
+            with open(script_path, "w") as f:
+                f.write(script_content.strip())
+            os.chmod(script_path, 0o755)  # Make script executable
+            
+            # Initialize status tracking for this script
+            status = {
+                "script_number": script_num,
+                "call_number": current_call,
+                "script_content": script_content,
+                "script_path": script_path,
+                "executed_on_kali": False,
+                "execution_result": None
+            }
+            
+            # Execute script if max_depth is True
+            if generate_response_parameters.max_depth:
+                print(f"[SCRIPT {current_call}_{script_num:02d}] Executing on Kali Linux...", flush=True)
+                execution_result = execute_bash_script(script_path)
+                status.update({
+                    "executed_on_kali": True,
+                    "execution_result": execution_result,
+                    "success": execution_result.get("success", False)
+                })
                 
-                # Add shebang if missing and save script
-                script_content = code if code.strip().startswith('#!/') else f'#!/bin/bash\n\n{code}'
-                script_path = f"generated_scripts/command_{current_call}_{script_num:02d}.sh"
+                # Save Kali's output to a separate file
+                kali_output_file = f"kali_output_{current_call}_{script_num:02d}.txt"
+                with open(kali_output_file, "w") as f:
+                    if execution_result.get("output"):
+                        f.write("=== Command Output ===\n")
+                        f.write(execution_result["output"])
+                        f.write("\n")
+                    if execution_result.get("error"):
+                        f.write("=== Error Output ===\n")
+                        f.write(execution_result["error"])
                 
-                with open(script_path, "w") as f:
-                    f.write(script_content.strip())
-                os.chmod(script_path, 0o755)  # Make script executable
-                
-                # Initialize status tracking for this script
-                status = {
-                    "script_number": script_num,
-                    "call_number": current_call,
-                    "script_content": script_content,
-                    "script_path": script_path,
-                    "executed_on_kali": False,
-                    "execution_result": None
-                }
-                
-                # Execute script if max_depth allows
-                if generate_response_parameters.max_depth > 0:
-                    print(f"[SCRIPT {current_call}_{script_num:02d}] Executing on Kali Linux...", flush=True)
-                    execution_result = execute_bash_script(script_path)
-                    status.update({
-                        "executed_on_kali": True,
-                        "execution_result": execution_result,
-                        "success": execution_result.get("success", False)
-                    })
-                    
-                    # Log execution status
-                    if execution_result.get("success"):
-                        print(f"[SCRIPT {current_call}_{script_num:02d}] ✓ Successfully executed", flush=True)
-                    else:
-                        error_msg = execution_result.get("error", "Unknown error")
-                        print(f"[SCRIPT {current_call}_{script_num:02d}] ✗ Execution failed: {error_msg}", flush=True)
+                # Log execution status
+                if execution_result.get("success"):
+                    print(f"[SCRIPT {current_call}_{script_num:02d}] ✓ Successfully executed", flush=True)
                 else:
-                    print(f"[SCRIPT {current_call}_{script_num:02d}] ℹ Script generated but not executed (max_depth=0)", flush=True)
-                
-                execution_status.append(status)
-
-        # Save detailed execution results to file
-        with open(f"script_results_{current_call}.txt", "w") as f:
-            for status in execution_status:
-                script_num = status["script_number"]
-                f.write(f"Call {current_call}, Script {script_num} results:\n")
-                f.write(f"Script content:\n{status['script_content']}\n\n")
-                f.write(f"Script path: {status['script_path']}\n")
-                f.write(f"Executed on Kali: {status['executed_on_kali']}\n")
-                
-                if status['executed_on_kali']:
-                    result = status['execution_result']
-                    f.write(f"Execution success: {result.get('success', False)}\n")
-                    if result.get('output'):
-                        f.write(f"Output:\n{result['output']}\n")
-                    if result.get('error'):
-                        f.write(f"Error:\n{result['error']}\n")
-                f.write("\n" + "="*50 + "\n\n")
+                    error_msg = execution_result.get("error", "Unknown error")
+                    print(f"[SCRIPT {current_call}_{script_num:02d}] ✗ Execution failed: {error_msg}", flush=True)
+            else:
+                print(f"[SCRIPT {current_call}_{script_num:02d}] ℹ Script generated but not executed (max_depth=False)", flush=True)
+            
+            execution_status.append(status)
 
         # Return generation and execution results
         return {
             "llm_output": output,
             "call_number": current_call,
-            "scripts_generated": len(code_blocks),
+            "scripts_generated": 1,  # Always 1 since we only process one script
             "execution_status": execution_status
         }
         
