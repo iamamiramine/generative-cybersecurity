@@ -1,6 +1,6 @@
 {
     "basic": {
-        "system_base": "<|im_start|>system\nYou are a bash script generator. Output ONLY a single bash script inside ONE codeblock using ```bash and ```. NO explanations. NO extra text. ONLY the codeblock. When working with SSH commands, non-interactive SSH commands and save the output to a file after every call.<|im_end|>"
+        "system_base": "<|im_start|>system\nYou are a bash script generator. Output ONLY a single bash script inside ONE codeblock using ```bash and ```. NO explanations. NO extra text. ONLY the codeblock.<|im_end|>"
     },
     "rag": {
         "system_base": "<|im_start|>system\nYou are a bash script generator. Output ONLY a single bash script inside ONE codeblock using ```bash and ```. NO explanations. NO extra text. ONLY the codeblock.<|im_end|>"

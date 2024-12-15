@@ -24,7 +24,7 @@ COPY ./requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install packages from apt
-RUN apt-get update && apt-get install -y nmap sudo hydra iproute2 nano
+RUN apt-get update && apt-get install -y nmap sudo hydra iproute2 nano zip
 
 COPY ./src ./src
 COPY ./app.py ./app.py

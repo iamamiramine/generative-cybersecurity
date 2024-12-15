@@ -56,6 +56,16 @@ def init_session_state():
     if "current_context" not in st.session_state:
         st.session_state.current_context = None
 
+    # Initialize SSH session state
+    if "ssh_session" not in st.session_state:
+        st.session_state.ssh_session = {
+            "active": False,
+            "host": None,
+            "user": None,
+            "control_path": None,
+            "last_command_output": None
+        }
+
     # Default parameters for text generation pipeline
     default_params = {
         "max_new_tokens": 2048,    # Maximum number of NEW tokens to generate (excluding prompt)
@@ -164,7 +174,7 @@ def render_generation_controls():
         st.session_state.pipeline_params["max_depth"] = st.slider(
             "Max Depth", 0, 1, 
             st.session_state.pipeline_params.get("max_depth", 1),
-            help="Maximum depth of context retrieval"
+            help="Maximum depth of the command execution"
         )
         
         # Chain Type selector - chooses between RAG and HYDE approaches
@@ -430,6 +440,47 @@ def display_chat_message(message: dict):
         st.markdown(message["content"], unsafe_allow_html=True)
 
 
+def update_ssh_session_state(script_content: str, execution_result: dict):
+    """Update SSH session state based on script execution
+    
+    Args:
+        script_content (str): The content of the executed script
+        execution_result (dict): The result of script execution
+    """
+    # Check if this is an SSH-related script
+    if "ssh" in script_content.lower():
+        # Extract SSH connection details using regex
+        ssh_pattern = r'ssh\s+(?:-\w+\s+)*(?:(\w+)@)?([^\s]+)'
+        matches = re.findall(ssh_pattern, script_content)
+        
+        if matches:
+            user, host = matches[-1]  # Take the last SSH command in case of multiple
+            
+            # Check if this is a ControlMaster setup command
+            if "ControlMaster" in script_content and execution_result.get("success", False):
+                control_path = re.findall(r'ControlPath=([^\s]+)', script_content)
+                if control_path:
+                    st.session_state.ssh_session.update({
+                        "active": True,
+                        "host": host,
+                        "user": user,
+                        "control_path": control_path[0]
+                    })
+            
+            # Store the last command output
+            if execution_result.get("output"):
+                st.session_state.ssh_session["last_command_output"] = execution_result["output"]
+            
+            # Check for session termination
+            if "ControlMaster=no" in script_content or "exit" in script_content.lower():
+                st.session_state.ssh_session.update({
+                    "active": False,
+                    "host": None,
+                    "user": None,
+                    "control_path": None
+                })
+
+
 def main():
     """Main function that handles the Streamlit chat interface and interaction flow"""
     # Initialize session state and render the header
@@ -454,6 +505,10 @@ def main():
     context = st.selectbox("Select Context", ["None", "File"], index=0)
     handle_context_switch(context)
 
+    # Display SSH session status if active
+    if st.session_state.ssh_session["active"]:
+        st.sidebar.success(f"🔗 Active SSH Session: {st.session_state.ssh_session['user']}@{st.session_state.ssh_session['host']}")
+    
     # Display chat history from session state
     for message in st.session_state.messages:
         with st.chat_message(message["role"], avatar=os.path.join("shared", "assets", "botpic.jpg") if message["role"] == "assistant" else None):
@@ -461,6 +516,10 @@ def main():
 
     # Handle new user input
     if prompt := st.chat_input("Ask me anything!"):
+        # If SSH session is active, prepend session info to prompt
+        if st.session_state.ssh_session["active"]:
+            prompt = f"Using the existing SSH session ({st.session_state.ssh_session['user']}@{st.session_state.ssh_session['host']}), {prompt}"
+        
         # Display user message
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -474,14 +533,13 @@ def main():
         with st.spinner("Generating response..."):
             reply = generate_response(prompt)
             
-            # Parse the response
             try:
-                # If reply is a string, try to parse it as JSON
+                # Parse the response
                 if isinstance(reply, str):
                     response_data = json.loads(reply)
                 else:
-                    response_data = reply  # If it's already a dict
-                    
+                    response_data = reply
+                
                 llm_output = response_data.get("llm_output", "")
                 execution_status = response_data.get("execution_status", [])
                 
@@ -502,6 +560,9 @@ def main():
                     # Display Kali output if script was executed
                     if execution_status and execution_status[0].get("executed_on_kali"):
                         execution_result = execution_status[0].get("execution_result", {})
+                        
+                        # Update SSH session state based on script execution
+                        update_ssh_session_state(code_blocks[0], execution_result)
                         
                         # Create a formatted output string
                         output_parts = []

@@ -10,7 +10,8 @@ Before starting, ensure you have the following installed on your system:
 - NVIDIA GPU with CUDA support (for model inference)
 - NVIDIA Container Toolkit (nvidia-docker2)
 
-### 1. Install Docker
+<details>
+<summary>### 1. Install Docker</summary>
 
 #### 1.1 Uninstall all conflicting packages
 
@@ -100,7 +101,10 @@ sudo systemctl disable docker.service
 sudo systemctl disable containerd.service
 ```
 
-### 2. Install NVIDIA Container Toolkit (Nvidia-docker)
+</details>
+
+<details>
+<summary>### 2. Install NVIDIA Container Toolkit (Nvidia-docker)</summary>
 
 #### 2.1 Run the following commands
 
@@ -155,11 +159,17 @@ Expected Output
 Runtimes: io.containerd.runc.v2 nvidia runc
 ```
 
+</details>
+
 ## Project Structure
 
 The application consists of two main components:
 - `generative-module-api`: The backend service running the AI model
 - `streamlit-module-api`: The frontend service providing the user interface
+
+### System Diagram
+
+Copy the code of the System Diagram from the SystemDiagram.md file and paste it into https://mermaid.live/
 
 ## Setup Instructions
 
