@@ -1,13 +1,5 @@
 from typing import Optional
 
-
-"""
-
-Generic Exceptions
-
-"""
-
-
 class GenericException(Exception):
     def __init__(
         self, name: str, message: Optional[str] = None, info: Optional[str] = None

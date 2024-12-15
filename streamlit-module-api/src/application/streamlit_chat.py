@@ -1,156 +1,174 @@
 import os
 import json
-from typing import Dict
 
 import streamlit as st
 import requests
 import time
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# Configuration
-@st.cache_data
+
+@st.cache_data  # Cache the config to avoid reloading on every rerun
 def get_config():
     """Load API configuration from JSON file and return complete config"""
     try:
-        # Assuming the config file is in a relative path from this file
+        # Construct path to config file in shared/config directory
         config_path = os.path.join("shared", "config", "api_config.json")
         
+        # Load and parse JSON config file
         with open(config_path) as f:
             api_config = json.load(f)
-            
+        
+        # Return dictionary with API configuration    
         return {
+            # Base URL for the generative module API
             "BASE_URL": api_config["generative_module"],
+            # URL for LangChain specific endpoints
             "LANGCHAIN_URL": f"{api_config['generative_module']}/langchain",
-            # "LOCAL_LLM_URL": f"{api_config["generative_module"]}/local_llm",
+            # Dictionary of API endpoint paths
             "ENDPOINTS": {
-                "model": "/load_model",
-                "pipeline": "/load_pipeline",
-                "docs": "/load_docs",
-                "retriever": "/load_ensemble_retriever_from_docs",
-                "chain": "/load_chain",
-                "generate": "/generate"
+                "model": "/load_model",         # Endpoint to load ML model
+                "pipeline": "/load_pipeline",   # Endpoint to load generation pipeline
+                "docs": "/load_docs",           # Endpoint to load documents
+                "retriever": "/load_ensemble_retriever_from_docs",  # Load document retriever
+                "chain": "/load_chain",         # Load LangChain chain
+                "generate": "/generate"         # Generate text endpoint
             }
         }
     
     except Exception as e:
+        # Log error and show error message in Streamlit UI
         logger.error(f"Error loading config: {e}")
-        st.error("Failed to load API configuration")
+        st.error("Failed to load API configuration") 
         return None
-    
-
-def check_service_status() -> Dict[str, bool]:
-    """Check the current status of the LangChain service"""
-    config = get_config()
-    try:
-        response = requests.get(f"{config['LANGCHAIN_URL']}/status")
-        if response.ok:
-            return response.json()
-        return {
-            "model_loaded": False,
-            "pipeline_loaded": False,
-            "docs_loaded": False,
-            "retriever_loaded": False,
-            "chain_loaded": False
-        }
-    except Exception as e:
-        logger.error(f"Error checking service status: {e}")
-        return {
-            "model_loaded": False,
-            "pipeline_loaded": False,
-            "docs_loaded": False,
-            "retriever_loaded": False,
-            "chain_loaded": False
-        }
 
  
-# Initialize session state
 def init_session_state():
+    """Initialize Streamlit session state variables and default parameters"""
+    # Initialize chat message history
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    
+    # Initialize current context for RAG
     if "current_context" not in st.session_state:
         st.session_state.current_context = None
-    # Add default generation parameters
+
+    # Default parameters for text generation pipeline
+    default_params = {
+        "max_new_tokens": 256,    # Maximum number of tokens to generate
+        "do_sample": True,        # Enable sampling (vs greedy decoding)
+        "temperature": 0.7,       # Controls randomness (higher = more random)
+        "top_p": 0.9,            # Nucleus sampling parameter
+        "top_k": 50,             # Top-k sampling parameter
+        "repetition_penalty": 1.1,# Penalize repeated tokens
+        "max_depth": 1,          # Maximum depth for context retrieval
+        "chain_type": "rag"      # Type of LangChain to use (RAG = Retrieval Augmented Generation)
+    }
+
+    # Initialize pipeline parameters if not already set
     if "pipeline_params" not in st.session_state:
-        st.session_state.pipeline_params = {
-            "max_new_tokens": 256,
-            "do_sample": True,
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "top_k": 50,
-            "repetition_penalty": 1.1,
-            "max_depth": 1
-        }
+        st.session_state.pipeline_params = default_params.copy()
+    
+    # Keep track of previous pipeline parameters to detect changes
+    if "previous_pipeline_params" not in st.session_state:
+        st.session_state.previous_pipeline_params = default_params.copy()
+    
+    # Track model and document loading status
     if "model_loaded" not in st.session_state:
         st.session_state.model_loaded = False
     if "docs_loaded" not in st.session_state:
         st.session_state.docs_loaded = False
-    if "retriever_loaded" not in st.session_state:
-        st.session_state.retriever_loaded = False
     
-    # Debug config loading
+    # Log server configuration details
     if st.config.get_option("server.headless"):
         logging.info("Running in headless mode")
     if st.config.get_option("logger.level"):
         logging.info(f"Logger level: {st.config.get_option('logger.level')}")
 
 
-# UI Components
+@st.cache_data  # Cache the header rendering to improve performance
 def render_header():
+    """Renders the application header with logo and title"""
+    # Construct path to logo image file
     logo_path = os.path.join("shared", "assets", "Logo.png")
+    
+    # Display logo image with width of 100 pixels
     st.image(logo_path, width=100)
+    
+    # Display application title
     st.title("Cyber Rabbit")
 
 
 def render_generation_controls():
-    """Render controls for generation parameters"""
+    """Render controls for generation parameters in the sidebar
+    
+    This function creates sliders and radio buttons in the Streamlit sidebar
+    to control various text generation parameters including:
+    - Temperature: Controls randomness of output
+    - Top P: Controls nucleus sampling threshold
+    - Top K: Controls number of tokens considered
+    - Max New Tokens: Controls length of generated text
+    - Repetition Penalty: Controls repetition in output
+    - Max Depth: Controls context retrieval depth
+    - Chain Type: Selects between RAG and HYDE approaches
+    """
     with st.sidebar:
+        # Add a subheader for the generation settings section
         st.subheader("Generation Settings")
-
-        # Store previous values to detect changes
-        prev_params = st.session_state.pipeline_params.copy()
         
-        # Pipeline parameters
+        # Temperature slider - controls randomness vs determinism
+        # Higher values (>1.0) increase randomness, lower values (<1.0) make output more focused
         st.session_state.pipeline_params["temperature"] = st.slider(
             "Temperature", 0.0, 2.0, 
-            prev_params["temperature"],
+            st.session_state.pipeline_params["temperature"],
             help="Higher values make output more random, lower values more deterministic"
         )
         
+        # Top P slider - implements nucleus sampling
+        # Only tokens with cumulative probability < top_p are considered
         st.session_state.pipeline_params["top_p"] = st.slider(
             "Top P", 0.0, 1.0, 
-            prev_params["top_p"],
+            st.session_state.pipeline_params["top_p"],
             help="Nucleus sampling: limits cumulative probability of tokens considered"
         )
         
+        # Top K slider - limits token consideration pool
+        # Only the top k most likely tokens are considered for sampling
         st.session_state.pipeline_params["top_k"] = st.slider(
             "Top K", 1, 100, 
-            prev_params["top_k"],
+            st.session_state.pipeline_params["top_k"],
             help="Limits the number of tokens considered for each step"
         )
         
+        # Max New Tokens slider - controls response length
+        # Sets upper limit on number of tokens in generated response
         st.session_state.pipeline_params["max_new_tokens"] = st.slider(
             "Max New Tokens", 32, 1024, 
-            prev_params["max_new_tokens"],
+            st.session_state.pipeline_params["max_new_tokens"],
             help="Maximum length of generated response"
         )
         
+        # Repetition Penalty slider - controls token reuse
+        # Higher values (>1.0) make the model less likely to repeat tokens
         st.session_state.pipeline_params["repetition_penalty"] = st.slider(
             "Repetition Penalty", 1.0, 2.0, 
-            prev_params["repetition_penalty"],
+            st.session_state.pipeline_params["repetition_penalty"],
             help="Higher values reduce repetition in generated text"
         )
 
+        # Max Depth slider - controls context retrieval depth
+        # Higher values allow more context to be retrieved but may slow performance
         st.session_state.pipeline_params["max_depth"] = st.slider(
             "Max Depth", 1, 5, 
-            prev_params.get("max_depth", 1),
+            st.session_state.pipeline_params.get("max_depth", 1),
             help="Maximum depth of context retrieval"
         )
         
+        # Chain Type selector - chooses between RAG and HYDE approaches
+        # RAG uses standard retrieval, HYDE uses hypothetical document embeddings
         chain_type = st.radio(
             "Chain Type",
             ["rag", "hyde"],
@@ -158,46 +176,38 @@ def render_generation_controls():
         )
         st.session_state.pipeline_params["chain_type"] = chain_type
 
-        if prev_params != st.session_state.pipeline_params:
-            with st.spinner("Reloading pipeline with new parameters..."):
-                load_pipeline()
-
 
 def initialize_base_components():
     """Initialize documents and retriever at startup"""
-    # Only load if not already loaded
-    if st.session_state.model_loaded and st.session_state.docs_loaded and st.session_state.retriever_loaded:
+    # Check if components are already loaded to avoid reloading
+    if st.session_state.model_loaded and st.session_state.docs_loaded:
         return True
 
+    # Get configuration settings
     config = get_config()
     if not config:
         return False
 
     try:
-        # Load documents if not loaded
+        # Load documents if not already loaded
         if not st.session_state.docs_loaded:
             st.info("Loading documents...")
+            # Make API call to load documents
             response = requests.post(f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['docs']}")
             if not response.ok:
                 st.error(f"Failed to load documents: {response.json().get('detail', 'Unknown error')}")
                 return False
             st.session_state.docs_loaded = True
+            st.success("Documents loaded successfully!")
 
-        # Load ensemble retriever if not loaded
-        if not st.session_state.retriever_loaded:
-            st.info("Loading retriever...")
-            response = requests.post(f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['retriever']}")
-            if not response.ok:
-                st.error(f"Failed to load retriever: {response.json().get('detail', 'Unknown error')}")
-                return False
-            st.session_state.retriever_loaded = True
-
-        # Load model if not loaded
+        # Load AI model if not already loaded
         if not st.session_state.model_loaded:
+            # Set model parameters for initialization
             model_params = {
                 "model_path": "models/WhiteRabbitNeo_WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B",
-                "bit_quantization": 4
+                "bit_quantization": 4  # Use 4-bit quantization for efficiency
             }
+            # Make API call to load model
             response = requests.post(
                 f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['model']}", 
                 json=model_params
@@ -206,46 +216,55 @@ def initialize_base_components():
                 st.error(f"Failed to load model: {response.json().get('detail', 'Unknown error')}")
                 return False
             st.session_state.model_loaded = True
+            st.success("Model loaded successfully!")
+
+        # Initialize the pipeline with current parameters
+        st.info("Loading pipeline...")
+        response = requests.post(
+            f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['pipeline']}", 
+            json=st.session_state.pipeline_params
+        )
+        if not response.ok:
+            st.error(f"Failed to load pipeline: {response.json().get('detail', 'Unknown error')}")
+            return False
+        st.success("Pipeline loaded successfully!")
 
         return True
 
     except Exception as e:
+        # Log any errors that occur during initialization
         logger.error(f"Error loading base components: {e}")
         st.error(f"Error loading base components: {str(e)}")
         return False
 
-def load_pipeline() -> bool:
+
+def load_pipeline(pipeline_params: dict) -> bool:
     """Load pipeline with current generation parameters"""
+    # Get configuration settings
     config = get_config()
     if not config:
         return False
 
     try:
-        pipeline_params = {
-            "max_new_tokens": st.session_state.pipeline_params["max_new_tokens"],
-            "do_sample": st.session_state.pipeline_params["do_sample"],
-            "temperature": st.session_state.pipeline_params["temperature"],
-            "top_p": st.session_state.pipeline_params["top_p"],
-            "top_k": st.session_state.pipeline_params["top_k"],
-            "repetition_penalty": st.session_state.pipeline_params["repetition_penalty"],
-            "max_depth": st.session_state.pipeline_params.get("max_depth", 1)
-        }
+        # Make API call to load pipeline with provided parameters
+        response = requests.post(
+            f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['pipeline']}", 
+            json=pipeline_params
+        )
         
-        # Only reload if parameters have changed
-        if pipeline_params != st.session_state.pipeline_params:
-            response = requests.post(
-                f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['pipeline']}", 
-                json=pipeline_params
-            )
-            if not response.ok:
-                st.error(f"Failed to load pipeline: {response.json().get('detail', 'Unknown error')}")
-                return False
-            # Update stored parameters
-            st.session_state.pipeline_params = pipeline_params
+        # Check if API call was successful
+        if not response.ok:
+            # Display error message if pipeline loading failed
+            st.error(f"Failed to load pipeline: {response.json().get('detail', 'Unknown error')}")
+            return False
+            
+        # Display success message
+        st.success("Pipeline loaded successfully!")
             
         return True
 
     except Exception as e:
+        # Log error and display message if exception occurs
         logger.error(f"Error loading pipeline: {e}")
         st.error(f"Error loading pipeline: {str(e)}")
         return False
@@ -253,21 +272,35 @@ def load_pipeline() -> bool:
 
 def load_context(context: str) -> bool:
     """Load context-specific chain"""
+    # Get configuration settings
     config = get_config()
     if not config:
         return False
 
     try:
-        # Context-specific chain loading
+        # Determine chain type based on context
+        # For File context, get chain_type from pipeline params (default to "rag")
+        # For other contexts, use "basic" chain type
         if context == "File":
-            chain_params = {
-                "chain_type": st.session_state.pipeline_params.get("chain_type", "rag")
-            }
+            chain_type = st.session_state.pipeline_params.get("chain_type", "rag")
         else:
-            chain_params = {
-                "chain_type": "basic"
-            }
+            chain_type = "basic"
+            st.session_state.pipeline_params["chain_type"] = chain_type
         
+        # Prepare parameters for chain initialization
+        chain_params = {"chain_type": chain_type}
+        # HyDE (Hypothetical Document Embeddings) is only used for specific chain type
+        use_hyde = chain_type == "hyde"
+
+        # First load the retriever component
+        st.info("Loading retriever...")
+        response = requests.post(f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['retriever']}", json={"use_hyde": use_hyde})
+        if not response.ok:
+            st.error(f"Failed to load retriever: {response.json().get('detail', 'Unknown error')}")
+            return False
+        st.success("Retriever loaded successfully!")
+        
+        # Then initialize the chain with specified parameters
         response = requests.post(
             f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['chain']}", 
             json=chain_params
@@ -275,85 +308,148 @@ def load_context(context: str) -> bool:
         if not response.ok:
             st.error(f"Failed to load chain: {response.json().get('detail', 'Unknown error')}")
             return False
+        st.success("Chain loaded successfully!")
         
         return True
         
     except Exception as e:
+        # Log any errors that occur during context loading
         logger.error(f"Error loading context: {e}")
         st.error(f"Error loading context: {str(e)}")
         return False
+    
+
+def handle_pipeline_switch():
+    """Handle pipeline switching with proper feedback"""
+    # Create dictionary of current pipeline parameters
+    current_params = {
+        # Maximum number of tokens to generate in response
+        "max_new_tokens": st.session_state.pipeline_params["max_new_tokens"],
+        # Whether to use sampling in text generation
+        "do_sample": st.session_state.pipeline_params["do_sample"], 
+        # Controls randomness in generation (higher = more random)
+        "temperature": st.session_state.pipeline_params["temperature"],
+        # Nucleus sampling parameter (higher = more diverse)
+        "top_p": st.session_state.pipeline_params["top_p"],
+        # Top-k sampling parameter (higher = more options)
+        "top_k": st.session_state.pipeline_params["top_k"],
+        # Penalty for repeating tokens (higher = less repetition)
+        "repetition_penalty": st.session_state.pipeline_params["repetition_penalty"],
+        # Maximum recursion depth for chain operations
+        "max_depth": st.session_state.pipeline_params.get("max_depth", 1),
+        # Type of chain to use (e.g. "rag" for retrieval-augmented generation)
+        "chain_type": st.session_state.pipeline_params.get("chain_type", "rag")
+    }
+        
+    # Check if parameters have changed from previous state
+    if current_params != st.session_state.previous_pipeline_params:
+        # Show loading spinner while switching pipeline
+        with st.spinner("Switching pipeline and reloading..."):
+            # Attempt to load new pipeline with current parameters
+            success = load_pipeline(current_params)
+            if success:
+                # Update previous parameters and show success message
+                st.session_state.previous_pipeline_params = current_params.copy()
+                st.success("Switched to pipeline successfully!")
+            else:
+                # Show error message if pipeline switch fails
+                st.error("Failed to switch pipeline. Please try again.")
 
 
 def handle_context_switch(context: str):
     """Handle context switching with proper feedback"""
+    # Check if the requested context is different from current context
     if st.session_state.current_context != context:
+        # Show loading spinner while context switch is in progress
         with st.spinner(f"Switching context to '{context}' and reloading..."):
-            # First ensure pipeline is loaded with current parameters
-            if not load_pipeline():
-                st.error("Failed to load pipeline")
-                return
-                
-            # Then load context-specific chain
+            # Update the current context in session state
+            st.session_state.current_context = context
+            # Attempt to load the new context
             success = load_context(context)
+            
+            # Show success message if context switch succeeded
             if success:
-                st.session_state.current_context = context
                 st.success(f"Switched to '{context}' context successfully!")
+            # Show error message if context switch failed    
             else:
                 st.error("Failed to switch context. Please try again.")
 
 
 def generate_response(prompt: str) -> str:
+    """
+    Generate a response to a given prompt using the configured API endpoint.
+    
+    Args:
+        prompt (str): The user's input prompt/question
+        
+    Returns:
+        str: The generated response text, or an error message if generation fails
+    """
+    # Get API configuration settings
     config = get_config()
     if not config:
         return "Error: Unable to load API configuration"
     
     try:
-        # Check if chain is loaded before generating
-        status = check_service_status()
-        if not status["chain_loaded"]:
-            return "Error: Chain not loaded. Please switch context first."
-
-        # Generate response with parameters
+        # Prepare parameters for the generate API endpoint
         generate_params = {
             "question": prompt,
+            # Get max_depth from pipeline params, default to 1 if not set
             "max_depth": st.session_state.pipeline_params.get("max_depth", 1),
-            "messages": st.session_state.messages  # Add message history
+            # Commented out for now - potential future feature
+            # "messages": st.session_state.messages
         }
+        
+        # Make POST request to generate endpoint
         response = requests.post(
             f"{config['LANGCHAIN_URL']}{config['ENDPOINTS']['generate']}", 
             json=generate_params
         )
 
+        # Handle unsuccessful API responses
         if not response.ok:
             error_detail = response.json().get('detail', 'Unknown error')
             logger.error(f"Error from API: {error_detail}")
             return f"Error generating response: {error_detail}"
 
+        # Parse and return the response
         response_data = response.json()
+        # Check for LLM output first (preferred response format)
         if "llm_output" in response_data:
             return response_data["llm_output"]
+        # Fall back to generic response field with default message if not found
         return response_data.get("response", "Sorry, I couldn't generate a response.")
     except Exception as e:
+        # Log and return any unexpected errors
         logger.error(f"Error generating response: {e}")
         return f"Error generating response: {str(e)}"
 
 
 def display_chat_message(message: str, stream: bool = True):
     """Display chat message with optional streaming effect"""
+    # Check if streaming effect is enabled
     if stream:
+        # Create an empty placeholder for the chat message
         chat_placeholder = st.empty()
+        # Iterate through message characters to create typing effect
         for i in range(len(message)):
+            # Display message up to current character index
+            # unsafe_allow_html=True allows markdown formatting
             chat_placeholder.markdown(message[:i+1], unsafe_allow_html=True)
+            # Add small delay between characters for realistic typing effect
             time.sleep(0.05)
     else:
+        # If streaming disabled, display full message immediately
         st.markdown(message)
 
 
 def main():
+    """Main function that handles the Streamlit chat interface and interaction flow"""
+    # Initialize session state and render the header
     init_session_state()
     render_header()
-    
-    # Initialize base components at startup
+
+    # Check if base components are loaded, if not load them
     if "base_components_loaded" not in st.session_state:
         with st.spinner("Loading base components..."):
             if initialize_base_components():
@@ -363,25 +459,27 @@ def main():
                 st.error("Failed to load base components")
                 return
     
+    # Render controls for generation parameters and handle pipeline selection
     render_generation_controls() 
+    handle_pipeline_switch()
 
-    # Context selector
+    # Create context selection dropdown and handle context changes
     context = st.selectbox("Select Context", ["None", "File"], index=0)
     handle_context_switch(context)
 
-    # Display chat history
+    # Display chat history from session state
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             display_chat_message(message["content"], stream=False)
 
-    # Chat input and response
+    # Handle new user input
     if prompt := st.chat_input("Ask me anything!"):
         # Display user message
         with st.chat_message("user"):
             st.markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
-        # Generate and display response
+        # Generate and display assistant response
         with st.spinner("Generating response..."):
             reply = generate_response(prompt)
             with st.chat_message("assistant", avatar=os.path.join("shared", "assets", "botpic.jpg")):

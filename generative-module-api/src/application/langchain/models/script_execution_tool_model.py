@@ -51,7 +51,6 @@ class ScriptExecutionTool(BaseTool):
             raise FileNotFoundError(f"Script {script_path} not found. Generate a script first.")
         
         try:
-            # Run the script and capture output
             result = subprocess.run(
                 [script_path],
                 capture_output=True,
