@@ -1,373 +1,369 @@
-# Generative Cybersecurity Application - Setup Guide
+<a id="readme-top"></a>
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
 
-This guide explains how to run the Generative Cybersecurity application. The application consists of two main services: a generative module API and a Streamlit frontend interface.
+<br />
+<div align="center">
+  <a href="https://github.com/othneildrew/Best-README-Template">
+    <img src="images/logo.png" alt="Logo" width="80" height="80">
+  </a>
 
-## Prerequisites
+  <h3 align="center">Generative Cybersecurity</h3>
 
-Before starting, ensure you have the following installed on your system:
-- Docker Engine (version 19.03.0+)
-- Docker Compose (version 2.0+)
-- NVIDIA GPU with CUDA support (for model inference)
-- NVIDIA Container Toolkit (nvidia-docker2)
+</div>
+
+# 🚀 **Generative Cybersecurity Application**
+
+An innovative AI-powered learning assistant for solving cybersecurity challenges, leveraging advanced AI models like **White Rabbit** with **Retrieval-Augmented Generation (RAG)** and **Hypothetical Document Embeddings (HyDE)** for accurate, context-aware responses.
+
+---
+
+## 📖 **Table of Contents**
+- [About the Project](#about-the-project)
+- [System Architecture](#system-architecture)
+- [Prerequisites](#prerequisites)
+- [Setup Instructions](#setup-instructions)
+- [Usage](#usage)
+- [Directory Structure](#directory-structure)
+- [Acknowledgments](#acknowledgments)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
+## 📝 **About the Project**
+
+The **Generative Cybersecurity Application** is designed to enhance learning and problem-solving in cybersecurity using generative AI models. It offers:
+- Context-aware assistance for cybersecurity challenges.
+- Ethical educational support using authorized materials like **OverTheWire Bandit wargame** series.
+- Integration of **AI-driven query enhancement** and **retrieval-based learning.**
+
+### **Key Features**
+- **Query Enhancement**: Improves user queries using LLM-based processing.
+- **Generative AI Responses**: Provides accurate answers using White Rabbit.
+- **Vector Database Integration**: Retrieves relevant cybersecurity documentation.
+- **User-Friendly Frontend**: A Streamlit UI for an intuitive experience.
+- **Educational Focus**: Covers fundamental Linux/Bash commands, SSH connectivity, file analysis, and basic cryptography.
+
+### Built With
+
+* [![Python][python-logo]][python-url]
+* [![Docker][docker-logo]][docker-url]
+* [![FastAPI][fastapi-logo]][fastapi-url]
+* [![Streamlit][streamlit-logo]][streamlit-url]
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
+## 🏗 **System Architecture**
+
+The system is built on a modular architecture, comprising:
+1. **Generative Module API**:
+   - Backend for AI model inference and FastAPI endpoints.
+2. **Streamlit Module API**:
+   - Frontend providing an interactive user interface.
+
+**System Diagram**: Copy and paste the code from `SystemDiagram.md` into [Mermaid Live Editor](https://mermaid.live/) to visualize the architecture.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
+## ✅ **Prerequisites**
+
+Ensure the following are installed on your system:
+- **Docker Engine** (19.03.0+)
+- **Docker Compose** (2.0+)
+- **NVIDIA GPU** with CUDA support
+- **NVIDIA Container Toolkit** (nvidia-docker2)
+
+### 🛠 **Installation Instructions**
 
 <details>
-<summary>### 1. Install Docker</summary>
+<summary><strong>Installing Docker</strong></summary>
 
-#### 1.1 Uninstall all conflicting packages
-
+##### Step 1: Uninstall Conflicting Packages
+Run the following command to remove any previously installed Docker-related packages that might conflict:
 ```bash
 for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
 ```
 
-#### 1.2 Set up Docker's `apt` repository
+##### Step 2: Set Up Docker's `apt` Repository
+1. Update the `apt` package index:
+    ```bash
+    sudo apt-get update
+    ```
 
-```bash
-sudo apt-get update
-```
+2. Install required packages:
+    ```bash
+    sudo apt-get install ca-certificates curl
+    ```
 
-```bash
-sudo apt-get install ca-certificates curl
-```
+3. Create the `/etc/apt/keyrings` directory:
+    ```bash
+    sudo install -m 0755 -d /etc/apt/keyrings
+    ```
 
-```bash
-sudo install -m 0755 -d /etc/apt/keyrings
-```
+4. Download and add Docker’s GPG key:
+    ```bash
+    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings/docker.asc
+    ```
 
-```bash
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-```
+5. Add the Docker repository:
+    ```bash
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    ```
 
-```bash
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-```
+6. Update the package index:
+    ```bash
+    sudo apt-get update
+    ```
 
-```bash
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-```
-
-```bash
-sudo apt-get update
-```
-
-#### 1.3 Install the Docker packages
-
+##### Step 3: Install Docker Packages
+Install Docker Engine, CLI, and associated plugins:
 ```bash
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-#### 1.4 Verify that the Docker Engine installation is successful by running the `hello-world` image
-
+##### Step 4: Verify the Installation
+Run the following command to verify that Docker is installed correctly:
 ```bash
 sudo docker run hello-world
 ```
 
-#### 1.5 Run Docker without root privileges
+##### Step 5: Enable Non-Root Docker Usage
+1. Add your user to the Docker group:
+    ```bash
+    sudo groupadd docker
+    sudo usermod -aG docker $USER
+    ```
 
-```bash
-sudo groupadd docker
-```
+2. Apply the changes:
+    ```bash
+    newgrp docker
+    ```
 
-```bash
-sudo usermod -aG docker $USER
-```
+3. Verify that you can run Docker commands without `sudo`:
+    ```bash
+    docker run hello-world
+    ```
 
-```bash
-newgrp docker
-```
-
-#### 1.6 Verify that you can run `docker` commands without `sudo`
-
-```bash
-docker run hello-world
-```
-
-#### 1.7 Automatically start Docker and containerd on boot
-
+##### Step 6: Enable Docker on Boot
+To start Docker and containerd on system boot:
 ```bash
 sudo systemctl enable docker.service
-```
-
-```bash
 sudo systemctl enable containerd.service
 ```
 
-##### 1.7.1 To stop this behavior, use `disable` instead
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-```bash
-sudo systemctl disable docker.service
-```
-
-```bash
-sudo systemctl disable containerd.service
-```
-
+---
 </details>
 
 <details>
-<summary>### 2. Install NVIDIA Container Toolkit (Nvidia-docker)</summary>
+<summary><strong>Installing NVIDIA Container Toolkit</strong></summary>
 
-#### 2.1 Run the following commands
-
+##### Step 1: Add NVIDIA’s Package Repository
+Run the following command to add NVIDIA's GPG key and repository:
 ```bash
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 ```
 
+##### Step 2: Enable the Experimental Components
+Edit the repository file to enable experimental components:
 ```bash
 sudo sed -i -e '/experimental/ s/^#//g' /etc/apt/sources.list.d/nvidia-container-toolkit.list
 ```
 
+##### Step 3: Update Package Index
 ```bash
 sudo apt-get update
 ```
 
+##### Step 4: Install NVIDIA Container Toolkit
 ```bash
 sudo apt-get install -y nvidia-container-toolkit
 ```
 
+##### Step 5: Configure the Runtime
+Set NVIDIA as the default runtime for Docker:
 ```bash
 sudo nvidia-ctk runtime configure --runtime=docker
-```
-
-```bash
 sudo systemctl restart docker
 ```
 
-#### 2.2 Make sure Nvidia-docker is installed
+##### Step 6: Verify the Installation
+1. Check that the NVIDIA Container Toolkit is installed:
+    ```bash
+    dpkg -l | grep nvidia-container-toolkit
+    ```
+    **Expected Output**:
+    ```plaintext
+    ii  nvidia-container-toolkit                   1.16.2-1                                amd64        NVIDIA Container toolkit
+    ii  nvidia-container-toolkit-base              1.16.2-1                                amd64        NVIDIA Container Toolkit Base
+    ```
 
-##### 2.2.1 Nvidia Container Toolkit
-
-```bash
-dpkg -l | grep nvidia-container-toolkit
-```
-
-Expected Output
-
-```bash
-ii  nvidia-container-toolkit                   1.16.2-1                                amd64        NVIDIA Container toolkit
-ii  nvidia-container-toolkit-base              1.16.2-1                                amd64        NVIDIA Container Toolkit Base
-```
-
-##### 2.2.2 Verify the NVIDIA runtime is available to Docker
-
-```bash
-sudo docker info | grep Runtimes
-```
-
-Expected Output
-
-```bash
-Runtimes: io.containerd.runc.v2 nvidia runc
-```
-
+2. Verify NVIDIA runtime is available to Docker:
+    ```bash
+    sudo docker info | grep Runtimes
+    ```
+    **Expected Output**:
+    ```plaintext
+    Runtimes: io.containerd.runc.v2 nvidia runc
+    ```
 </details>
 
-## Project Structure
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-The application consists of two main components:
-- `generative-module-api`: The backend service running the AI model
-- `streamlit-module-api`: The frontend service providing the user interface
+---
 
-### System Diagram
+## ⚙️ **Setup Instructions**
 
-Copy the code of the System Diagram from the SystemDiagram.md file and paste it into https://mermaid.live/
+### 1. Clone the Repository
+```bash
+git clone https://github.com/iamamiramine/generative-cybersecurity.git
+cd generative-cybersecurity
+```
 
-## Setup Instructions
+### 2. Install Docker and NVIDIA Toolkit
+Refer to [this section in the README](#prerequisites) for the installation commands.
 
-### 1. Create Docker Network
-
-First, create the required Docker network:
+### 3. Create Docker Network
 ```bash
 docker network create generative-cybersecurity-network
 ```
 
-### 2. Prepare Directory Structure
+### 4. Prepare Directory Structure
+Ensure the following folders exist:
+- `models/` - Stores AI models.
+- `data/` - Stores application data (only `.txt` files are supported).
 
-Ensure you have the following directory structure:
-
-generative-cybersecurity
-
-├── models/                    # Contains AI models
-
-├── data/                     # Contains application data 
-
-├── shared/                   # Shared resources
-
-│   ├── assets/              # Images and other assets
-
-│   └── config/              # Configuration files
-
-├── generative-module-api/    # Backend service
-
-└── streamlit-module-api/     # Frontend service
-
-
-### 3. Data Setup
-
-Create a directory named "data" in the root directory of the project. Place your txt files related to bash scripts and cybersecurity in this directory.
-
-The directory structure should look like:
-generative-cybersecurity/data/
-
-Note: Only txt files are supported for now. The data directory must be named exactly as "data" since this path is referenced in the docker-compose.yml file for volume mounting.
-
-
-### 4. Model Setup
-
-First, create a "models" directory in the root folder of the project if it doesn't already exist. This is where the model will be downloaded.
-
-To download the required model, make a POST request to the `/download_llm` endpoint of the generative module API:
-
+### 5. Download the Model
+Use the following command to download the required model:
 ```bash
 curl -X POST http://localhost:7575/download_llm -H "Content-Type: application/json" -d '{"model_name": "WhiteRabbitNeo/WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B"}'
 ```
 
-This will download the model to the following path:
+Alternatively, use Swagger UI at `http://localhost:7575/docs#/`.
 
-```bash
-generative-cybersecurity/models/WhiteRabbitNeo_WhiteRabbitNeo-2.5-Qwen-2.5-Coder-7B/
-```
-
-or use Swagger UI to download the model:
-
-```bash
-http://localhost:7575/docs#/
-```
-
-### 5. Configuration
-
-Ensure your `shared/config/api_config.json` is properly configured with the correct endpoints:
-
-```json
-{
-"generative_module": "http://generative-module-api:80"
-}
-```
-
-Note: generative-module-api is the name of the service in the docker-compose.yml file.
-
-### 6. Running the Application
-
-To create the docker network, run:
-(Note: this step is only required if you are running the application for the first time.)
-```bash
-docker network create generative-cybersecurity-network
-```
-Note: the network name must match the network name in the docker-compose.yml file.
-
-To build the application, run:
-
+### 6. Build and Run the Application
 ```bash
 docker compose build
-```
-
-To run the application, run:
-
-```bash
 docker compose up
 ```
 
-This will:
-- Build and start both services
-- Mount necessary volumes
-- Configure GPU access for the generative module
-- Map ports for both services
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### 7. Accessing the Application
+---
 
-Once running, you can access:
-- Streamlit UI: `http://0.0.0.0:7500`
-- Generative API: `http://0.0.0.0:7575/docs` (Swagger UI)
+## 🚀 **Usage**
 
-### 8. Service Ports
+### **Accessing the Application**
+- **Streamlit Frontend**: [http://localhost:7500](http://localhost:7500)
+- **Generative API Swagger UI**: [http://localhost:7575/docs](http://localhost:7575/docs)
 
-- Streamlit Frontend: Port 7500
-- Generative API: Port 7575
+### **FastAPI Endpoints**
+1. **Without Context**:
+   - `POST /load_model`
+   - `POST /load_pipeline`
+   - `POST /load_chain`
+   - `POST /generate`
+2. **With Context**:
+   - `POST /load_model`
+   - `POST /load_pipeline`
+   - `POST /load_docs`
+   - `POST /load_ensemble_retriever_from_docs`
+   - `POST /load_chain`
+   - `POST /generate`
 
-The ports are pre-defined in the docker-compose.yml file.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### 9. Running FastAPI Endpoints
+---
 
-Access the FastAPI endpoints using the following URL:
+## 📂 **Directory Structure**
 
-```bash
-http://localhost:7575/docs
+```plaintext
+generative-cybersecurity/
+├── models/                    # Contains AI models
+├── data/                      # Contains application data
+├── shared/                    # Shared resources
+│   ├── assets/                # Images and other assets
+│   └── config/                # Configuration files
+├── generative-module-api/     # Backend service
+└── streamlit-module-api/      # Frontend service
 ```
 
-This will provide a Swagger UI for testing the FastAPI endpoints.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-The sequential order of the endpoints is as follows:
+---
 
-#### No Context
+## 🛠 **Streamlit UI Workflow**
 
-1. Load the model
-```bash
-POST /load_model
-```
-2. Load the pipeline
-```bash
-POST /load_pipeline
-```
-3. Load Chain
-```bash
-POST /load_chain
-```
-4. Generate text
-```bash
-POST /generate
-```
+1. Load the model.
+2. Load the pipeline.
+3. Load the documents.
+4. Load the ensemble retriever.
+5. Load the chain.
+6. Generate text.
 
-#### With Context
+> The UI dynamically reloads components like the pipeline and chain when parameters or context change.
 
-1. Load the model
-```bash
-POST /load_model
-```
-2. Load the pipeline
-```bash
-POST /load_pipeline
-```
-3. Load Documents
-```bash
-POST /load_docs
-```
-4. Load Ensemble Retriever
-```bash
-POST /load_ensemble_retriever_from_docs
-```
-5. Load Chain
-```bash
-POST /load_chain
-```
-6. Generate text
-```bash
-POST /generate
-```
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+---
 
-### 10. Streamlit UI
+<!-- CONTRIBUTING -->
+## Contributing
 
-To access the Streamlit UI, run:
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-```bash
-http://localhost:7500
-```
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
+Don't forget to give the project a star! Thanks again!
 
-This will provide a user interface for interacting with the application.
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-The application will call the following endpoints in order:
+### Top contributors:
 
-1. Load the model
-2. Load the pipeline
-3. Load the documents
-4. Load the ensemble retriever
-5. Load the chain
-6. Generate text
+<a href="https://github.com/iamamiramine/generative-cybersecuritye/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=iamamiramine/generative-cybersecurity" alt="contrib.rocks image" />
+</a>
 
-At every context change, the application will reload:
-1. The ensemble retriever
-2. The chain
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-At every change of parameters, the application will reload:
-1. The pipeline
-2. The chain
+---
 
+## 💡 **Acknowledgments**
+
+Special thanks to:
+- The **White Rabbit** open-source community for their LLM contributions.
+- The **OverTheWire** community for providing ethical cybersecurity challenges.
+- Open-source tools and libraries that made this project possible.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
+[contributors-shield]: https://img.shields.io/github/contributors/othneildrew/Best-README-Template.svg?style=for-the-badge
+[contributors-url]: https://github.com/iamamiramine/generative-cybersecurity/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/othneildrew/Best-README-Template.svg?style=for-the-badge
+[forks-url]: https://github.com/iamamiramine/generative-cybersecurity/network/members
+[stars-shield]: https://img.shields.io/github/stars/othneildrew/Best-README-Template.svg?style=for-the-badge
+[stars-url]: https://github.com/iamamiramine/generative-cybersecurity/stargazers
+[issues-shield]: https://img.shields.io/github/issues/othneildrew/Best-README-Template.svg?style=for-the-badge
+[issues-url]: https://github.com/iamamiramine/generative-cybersecurity/issues
+[python-logo]: https://img.shields.io/badge/Python-3.8%2B-blue?style=for-the-badge&logo=python&logoColor=white
+[python-url]: https://www.python.org/
+[docker-logo]: https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white
+[docker-url]: https://www.docker.com/
+[fastapi-logo]: https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white
+[fastapi-url]: https://fastapi.tiangolo.com/
+[streamlit-logo]: https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white
+[streamlit-url]: https://streamlit.io/
