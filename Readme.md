@@ -6,15 +6,15 @@
 
 <br />
 <div align="center">
-  <a href="https://github.com/othneildrew/Best-README-Template">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
+  <a href="https://github.com/iamamiramine/generative-cybersecurity">
+    <img src="shared/assets/Logo.png" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">Generative Cybersecurity</h3>
 
 </div>
 
-# 🚀 **Generative Cybersecurity Application**
+# 🚀 **Generative Cybersecurity**
 
 An innovative AI-powered learning assistant for solving cybersecurity challenges, leveraging advanced AI models like **White Rabbit** with **Retrieval-Augmented Generation (RAG)** and **Hypothetical Document Embeddings (HyDE)** for accurate, context-aware responses.
 
@@ -351,13 +351,13 @@ Special thanks to:
 
 ---
 
-[contributors-shield]: https://img.shields.io/github/contributors/othneildrew/Best-README-Template.svg?style=for-the-badge
+[contributors-shield]: https://img.shields.io/github/contributors/iamamiramine/generative-cybersecurity.svg?style=for-the-badge
 [contributors-url]: https://github.com/iamamiramine/generative-cybersecurity/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/othneildrew/Best-README-Template.svg?style=for-the-badge
+[forks-shield]: https://img.shields.io/github/forks/iamamiramine/generative-cybersecurity.svg?style=for-the-badge
 [forks-url]: https://github.com/iamamiramine/generative-cybersecurity/network/members
-[stars-shield]: https://img.shields.io/github/stars/othneildrew/Best-README-Template.svg?style=for-the-badge
+[stars-shield]: https://img.shields.io/github/stars/iamamiramine/generative-cybersecurity.svg?style=for-the-badge
 [stars-url]: https://github.com/iamamiramine/generative-cybersecurity/stargazers
-[issues-shield]: https://img.shields.io/github/issues/othneildrew/Best-README-Template.svg?style=for-the-badge
+[issues-shield]: https://img.shields.io/github/issues/iamamiramine/generative-cybersecurity.svg?style=for-the-badge
 [issues-url]: https://github.com/iamamiramine/generative-cybersecurity/issues
 [python-logo]: https://img.shields.io/badge/Python-3.8%2B-blue?style=for-the-badge&logo=python&logoColor=white
 [python-url]: https://www.python.org/
